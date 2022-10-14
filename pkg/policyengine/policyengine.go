@@ -32,6 +32,17 @@ const (
 	UpdateDelete                   // Instructs that the transaction should be removed completely from persistence - generally only returned when TX status is TxStatusDeleteRequested
 )
 
+type NonceHint int64
+
+type PolicyExecutionResult struct {
+	Hint NonceHint
+}
+
+const (
+	NonceOK     NonceHint = -1
+	NonceTooLow NonceHint = -2
+)
+
 type PolicyEngine interface {
-	Execute(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (updateType UpdateType, reason ffcapi.ErrorReason, err error)
+	Execute(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (updateType UpdateType, result PolicyExecutionResult, reason ffcapi.ErrorReason, err error)
 }

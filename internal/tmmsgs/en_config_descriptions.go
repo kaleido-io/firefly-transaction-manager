@@ -61,6 +61,15 @@ var (
 	ConfigPolicyEngineSimpleGasOracleMethod        = ffc("config.policyengine.simple.gasOracle.method", "The HTTP Method to use when invoking the Gas Oracle REST API", i18n.StringType)
 	ConfigPolicyEngineSimpleGasOracleQueryInterval = ffc("config.policyengine.simple.gasOracle.queryInterval", "The minimum interval between queries to the Gas Oracle", i18n.TimeDurationType)
 
+	ConfigPolicyEngineComplexFixedGasPrice          = ffc("config.policyengine.complex.fixedGasPrice", "A fixed gasPrice value/structure to pass to the connector", "Raw JSON")
+	ConfigPolicyEngineComplexResubmitInterval       = ffc("config.policyengine.complex.resubmitInterval", "The time between warning and re-sending a transaction (same nonce) when a blockchain transaction has not been allocated a receipt", i18n.TimeDurationType)
+	ConfigPolicyEngineComplexGasOracleEnabled       = ffc("config.policyengine.complex.gasOracle.mode", "The gas oracle mode", "connector | restapi | disabled")
+	ConfigPolicyEngineComplexGasOracleGoTemplate    = ffc("config.policyengine.complex.gasOracle.template", "REST API Gas Oracle: A go template to execute against the result from the Gas Oracle, to create a JSON block that will be passed as the gas price to the connector", i18n.GoTemplateType)
+	ConfigPolicyEngineComplexGasOracleURL           = ffc("config.policyengine.complex.gasOracle.url", "REST API Gas Oracle: The URL of a Gas Oracle REST API to call", i18n.StringType)
+	ConfigPolicyEngineComplexGasOracleProxyURL      = ffc("config.policyengine.complex.gasOracle.proxy.url", "Optional HTTP proxy URL to use for the Gas Oracle REST API", i18n.StringType)
+	ConfigPolicyEngineComplexGasOracleMethod        = ffc("config.policyengine.complex.gasOracle.method", "The HTTP Method to use when invoking the Gas Oracle REST API", i18n.StringType)
+	ConfigPolicyEngineComplexGasOracleQueryInterval = ffc("config.policyengine.complex.gasOracle.queryInterval", "The minimum interval between queries to the Gas Oracle", i18n.TimeDurationType)
+
 	ConfigEventStreamsDefaultsBatchSize                 = ffc("config.eventstreams.defaults.batchSize", "Default batch size for newly created event streams", i18n.IntType)
 	ConfigEventStreamsDefaultsBatchTimeout              = ffc("config.eventstreams.defaults.batchTimeout", "Default batch timeout for newly created event streams", i18n.TimeDurationType)
 	ConfigEventStreamsDefaultsErrorHandling             = ffc("config.eventstreams.defaults.errorHandling", "Default error handling for newly created event streams", "'skip' or 'block'")

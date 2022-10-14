@@ -54,7 +54,7 @@ func newTestTxn(t *testing.T, m *manager, signer string, nonce int64, status api
 func noopPolicyEngine(m *manager) {
 	mpe := &policyenginemocks.PolicyEngine{}
 	m.policyEngine = mpe
-	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateNo, ffcapi.ErrorReason(""), nil).Maybe()
+	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateNo, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, ffcapi.ErrorReason(""), nil).Maybe()
 }
 
 func TestGetTransactions(t *testing.T) {

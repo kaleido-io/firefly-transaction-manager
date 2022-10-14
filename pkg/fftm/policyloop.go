@@ -240,10 +240,20 @@ func (m *manager) execPolicy(ctx context.Context, pending *pendingState, syncDel
 			// Pass the state to the pluggable policy engine to potentially perform more actions against it,
 			// such as submitting for the first time, or raising the gas etc.
 			var reason ffcapi.ErrorReason
-			update, reason, err = m.policyEngine.Execute(ctx, m.connector, pending.mtx)
+			var result policyengine.PolicyExecutionResult
+			update, result, reason, err = m.policyEngine.Execute(ctx, m.connector, pending.mtx)
+
+			log.L(ctx).Errorf("Nonce hint: %d", result.Hint)
+			// Check if the policy engine gave us a nonce hint
+			if result.Hint != policyengine.NonceOK {
+				// Passing hint to nonce manager
+				m.applyNonceHint(ctx, mtx.TransactionHeaders.From, result.Hint)
+			}
+
 			if err != nil {
 				log.L(ctx).Errorf("Policy engine returned error for transaction %s reason=%s: %s", mtx.ID, reason, err)
 				m.addError(mtx, reason, err)
+
 				update = policyengine.UpdateYes
 			} else {
 				log.L(ctx).Debugf("Policy engine executed for tx %s (update=%d,status=%s,hash=%s)", mtx.ID, update, mtx.Status, mtx.TransactionHash)

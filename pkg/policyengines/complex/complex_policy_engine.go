@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package simple
+package complex
 
 import (
 	"bytes"
@@ -39,7 +39,7 @@ import (
 type PolicyEngineFactory struct{}
 
 func (f *PolicyEngineFactory) Name() string {
-	return "simple"
+	return "complex"
 }
 
 // simplePolicyEngine is a base policy engine forming an example for extension:
@@ -48,7 +48,7 @@ func (f *PolicyEngineFactory) Name() string {
 // - It logs errors transactions breach certain configured thresholds of staleness
 func (f *PolicyEngineFactory) NewPolicyEngine(ctx context.Context, conf config.Section) (pe policyengine.PolicyEngine, err error) {
 	gasOracleConfig := conf.SubSection(GasOracleConfig)
-	p := &simplePolicyEngine{
+	p := &complexPolicyEngine{
 		resubmitInterval: conf.GetDuration(ResubmitInterval),
 		fixedGasPrice:    fftypes.JSONAnyPtr(conf.GetString(FixedGasPrice)),
 
@@ -56,6 +56,7 @@ func (f *PolicyEngineFactory) NewPolicyEngine(ctx context.Context, conf config.S
 		gasOracleQueryInterval: gasOracleConfig.GetDuration(GasOracleQueryInterval),
 		gasOracleMode:          gasOracleConfig.GetString(GasOracleMode),
 	}
+	log.L(ctx).Info("Starting complex policy engine")
 	switch p.gasOracleMode {
 	case GasOracleModeConnector:
 		// No initialization required
@@ -77,7 +78,7 @@ func (f *PolicyEngineFactory) NewPolicyEngine(ctx context.Context, conf config.S
 	return p, nil
 }
 
-type simplePolicyEngine struct {
+type complexPolicyEngine struct {
 	fixedGasPrice    *fftypes.JSONAny
 	resubmitInterval time.Duration
 
@@ -90,13 +91,13 @@ type simplePolicyEngine struct {
 	gasOracleLastQueryTime *fftypes.FFTime
 }
 
-type simplePolicyInfo struct {
+type complexPolicyInfo struct {
 	LastWarnTime *fftypes.FFTime `json:"lastWarnTime"`
 }
 
 // withPolicyInfo is a convenience helper to run some logic that accesses/updates our policy section
-func (p *simplePolicyEngine) withPolicyInfo(ctx context.Context, mtx *apitypes.ManagedTX, fn func(info *simplePolicyInfo) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error)) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error) {
-	var info simplePolicyInfo
+func (p *complexPolicyEngine) withPolicyInfo(ctx context.Context, mtx *apitypes.ManagedTX, fn func(info *complexPolicyInfo) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error)) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error) {
+	var info complexPolicyInfo
 	infoBytes := []byte(mtx.PolicyInfo.String())
 	if len(infoBytes) > 0 {
 		err := json.Unmarshal(infoBytes, &info)
@@ -112,7 +113,7 @@ func (p *simplePolicyEngine) withPolicyInfo(ctx context.Context, mtx *apitypes.M
 	return update, result, reason, err
 }
 
-func (p *simplePolicyEngine) submitTX(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (reason ffcapi.ErrorReason, err error) {
+func (p *complexPolicyEngine) submitTX(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (reason ffcapi.ErrorReason, err error) {
 	sendTX := &ffcapi.TransactionSendRequest{
 		TransactionHeaders: mtx.TransactionHeaders,
 		GasPrice:           mtx.GasPrice,
@@ -120,7 +121,7 @@ func (p *simplePolicyEngine) submitTX(ctx context.Context, cAPI ffcapi.API, mtx 
 	}
 	sendTX.TransactionHeaders.Nonce = (*fftypes.FFBigInt)(mtx.Nonce.Int())
 	sendTX.TransactionHeaders.Gas = (*fftypes.FFBigInt)(mtx.Gas.Int())
-	log.L(ctx).Debugf("Sending transaction %s at nonce %s / %d (lastSubmit=%s)", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.LastSubmit)
+	log.L(ctx).Debugf("Complex engine sending transaction %s at nonce %s / %d (lastSubmit=%s)", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.LastSubmit)
 	res, reason, err := cAPI.TransactionSend(ctx, sendTX)
 	if err == nil {
 		mtx.TransactionHash = res.TransactionHash
@@ -128,10 +129,10 @@ func (p *simplePolicyEngine) submitTX(ctx context.Context, cAPI ffcapi.API, mtx 
 	} else {
 		// We have some simple rules for handling reasons from the connector, which could be enhanced by extending the connector.
 		switch reason {
-		case ffcapi.ErrorKnownTransaction, ffcapi.ErrorReasonNonceTooLow:
+		case ffcapi.ErrorKnownTransaction:
 			// If we already have a transaction hash, this is fine - we just return as if we submitted it
 			if mtx.TransactionHash != "" {
-				log.L(ctx).Debugf("Transaction %s at nonce %s / %d known with hash: %s (%s)", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.TransactionHash, err)
+				log.L(ctx).Debugf("Complex engine transaction %s at nonce %s / %d known with hash: %s (%s)", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.TransactionHash, err)
 				return "", nil
 			}
 			// Note: to cover the edge case where we had a timeout or other failure during the initial TransactionSend,
@@ -139,15 +140,17 @@ func (p *simplePolicyEngine) submitTX(ctx context.Context, cAPI ffcapi.API, mtx 
 			//       This would require a new FFCAPI API to calculate that hash, which requires the connector to perform the signing
 			//       without submission to the node. For example using `eth_signTransaction` for EVM JSON/RPC.
 			return reason, err
+		case ffcapi.ErrorReasonNonceTooLow:
+			return reason, err
 		default:
 			return reason, err
 		}
 	}
-	log.L(ctx).Infof("Transaction %s at nonce %s / %d submitted. Hash: %s", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.TransactionHash)
+	log.L(ctx).Infof("Complex engine transaction %s at nonce %s / %d submitted. Hash: %s", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.TransactionHash)
 	return "", nil
 }
 
-func (p *simplePolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error) {
+func (p *complexPolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error) {
 
 	// Simply policy engine allows deletion of the transaction without additional checks ( ensuring the TX has not been submitted / gap filling the nonce etc. )
 	if mtx.DeleteRequested != nil {
@@ -163,6 +166,26 @@ func (p *simplePolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *
 		}
 		// Submit the first time
 		if reason, err := p.submitTX(ctx, cAPI, mtx); err != nil {
+			if reason == ffcapi.ErrorReasonNonceTooLow {
+				log.L(ctx).Infof("Complex engine nonce %s / %d for transaction %s is too low. Incrementing nonce and re-submitting.", mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.ID)
+				mtx.Nonce = fftypes.NewFFBigInt(mtx.Nonce.Int64() + 1)
+
+				resubReason, resubErr := p.submitTX(ctx, cAPI, mtx)
+				if resubErr != nil {
+					if resubReason == ffcapi.ErrorReasonNonceTooLow {
+						log.L(ctx).Infof("Failed on trying to resubmit with bigger nonce. Give up")
+						// We tried once more - give up for now and return the best hint we can to the caller
+						mtx.Nonce = fftypes.NewFFBigInt(mtx.Nonce.Int64() + 1)
+						return policyengine.UpdateYes, policyengine.PolicyExecutionResult{Hint: policyengine.NonceHint(mtx.Nonce.Int64())}, resubReason, resubErr
+					}
+				} else {
+					// We managed to submit it. We mustn't return an error but we can at least give the transaction manager
+					// a hint that their current nonce is incorrect for their next transaction
+					log.L(ctx).Infof("Complex engine succeeded in re-submitting transaction %s after increasing the nonce", mtx.ID)
+					mtx.FirstSubmit = mtx.LastSubmit
+					return policyengine.UpdateYes, policyengine.PolicyExecutionResult{Hint: policyengine.NonceHint(mtx.Nonce.Int64())}, "", nil
+				}
+			}
 			return policyengine.UpdateYes, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, reason, err
 		}
 		mtx.FirstSubmit = mtx.LastSubmit
@@ -173,7 +196,7 @@ func (p *simplePolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *
 		// A more sophisticated policy engine would look at the reason for the lack of a receipt, and consider taking progressive
 		// action such as increasing the gas cost slowly over time. This simple example shows how the policy engine
 		// can use the FireFly core operation as a store for its historical state/decisions (in this case the last time we warned).
-		return p.withPolicyInfo(ctx, mtx, func(info *simplePolicyInfo) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error) {
+		return p.withPolicyInfo(ctx, mtx, func(info *complexPolicyInfo) (update policyengine.UpdateType, result policyengine.PolicyExecutionResult, reason ffcapi.ErrorReason, err error) {
 			lastWarnTime := info.LastWarnTime
 			if lastWarnTime == nil {
 				lastWarnTime = mtx.FirstSubmit
@@ -181,10 +204,29 @@ func (p *simplePolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *
 			now := fftypes.Now()
 			if now.Time().Sub(*lastWarnTime.Time()) > p.resubmitInterval {
 				secsSinceSubmit := float64(now.Time().Sub(*mtx.FirstSubmit.Time())) / float64(time.Second)
-				log.L(ctx).Infof("Transaction %s at nonce %s / %d has not been mined after %.2fs", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), secsSinceSubmit)
+				log.L(ctx).Infof("Complex engine transaction %s at nonce %s / %d has not been mined after %.2fs", mtx.ID, mtx.TransactionHeaders.From, mtx.Nonce.Int64(), secsSinceSubmit)
 				info.LastWarnTime = now
 				// We do a resubmit at this point - as it might no longer be in the TX pool
 				if reason, err := p.submitTX(ctx, cAPI, mtx); err != nil {
+					if reason == ffcapi.ErrorReasonNonceTooLow {
+						// We seem to be out of step with the nonce for this signing address. Let's see if we can get the transaction submitted
+						// and then return a hint to the nonce manager so it knows where the chain has got to
+						log.L(ctx).Infof("Complex engine nonce %s / %d for transaction %s is too low. Incrementing nonce and re-submitting.", mtx.TransactionHeaders.From, mtx.Nonce.Int64(), mtx.ID)
+						mtx.Nonce = fftypes.NewFFBigInt(mtx.Nonce.Int64() + 1)
+
+						resubReason, resubErr := p.submitTX(ctx, cAPI, mtx)
+						if resubErr != nil {
+							if resubReason == ffcapi.ErrorReasonNonceTooLow {
+								log.L(ctx).Infof("Failed on trying to resubmit with bigger nonce. Give up")
+								// We tried once more - give up for now and return the best hint we can to the caller
+								mtx.Nonce = fftypes.NewFFBigInt(mtx.Nonce.Int64() + 1)
+								return policyengine.UpdateYes, policyengine.PolicyExecutionResult{Hint: policyengine.NonceHint(mtx.Nonce.Int64())}, resubReason, resubErr
+							}
+						} else {
+							log.L(ctx).Infof("Complex engine succeeded in re-submitting transaction %s after increasing the nonce", mtx.ID)
+							return policyengine.UpdateYes, policyengine.PolicyExecutionResult{Hint: policyengine.NonceHint(mtx.Nonce.Int64())}, "", nil
+						}
+					}
 					if reason != ffcapi.ErrorKnownTransaction {
 						return policyengine.UpdateYes, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, reason, err
 					}
@@ -200,7 +242,7 @@ func (p *simplePolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *
 }
 
 // getGasPrice either uses a fixed gas price, or invokes a gas station API
-func (p *simplePolicyEngine) getGasPrice(ctx context.Context, cAPI ffcapi.API) (gasPrice *fftypes.JSONAny, err error) {
+func (p *complexPolicyEngine) getGasPrice(ctx context.Context, cAPI ffcapi.API) (gasPrice *fftypes.JSONAny, err error) {
 	if p.gasOracleQueryValue != nil && p.gasOracleLastQueryTime != nil &&
 		time.Since(*p.gasOracleLastQueryTime.Time()) < p.gasOracleQueryInterval {
 		return p.gasOracleQueryValue, nil
@@ -232,7 +274,7 @@ func (p *simplePolicyEngine) getGasPrice(ctx context.Context, cAPI ffcapi.API) (
 	}
 }
 
-func (p *simplePolicyEngine) getGasPriceAPI(ctx context.Context) (gasPrice *fftypes.JSONAny, err error) {
+func (p *complexPolicyEngine) getGasPriceAPI(ctx context.Context) (gasPrice *fftypes.JSONAny, err error) {
 	var jsonResponse map[string]interface{}
 	res, err := p.gasOracleClient.R().
 		SetResult(&jsonResponse).
