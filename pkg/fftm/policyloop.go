@@ -255,6 +255,9 @@ func (m *manager) execPolicy(ctx context.Context, pending *pendingState, syncDel
 				m.addError(mtx, reason, err)
 
 				update = policyengine.UpdateYes
+				if m.metricsManager.IsMetricsEnabled() {
+					m.metricsManager.TransactionSubmissionError()
+				}
 			} else {
 				log.L(ctx).Debugf("Policy engine executed for tx %s (update=%d,status=%s,hash=%s)", mtx.ID, update, mtx.Status, mtx.TransactionHash)
 				if mtx.FirstSubmit != nil && pending.trackingTransactionHash != mtx.TransactionHash {
