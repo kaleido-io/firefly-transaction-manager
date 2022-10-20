@@ -20,7 +20,7 @@ type PolicyEngine struct {
 }
 
 // Execute provides a mock function with given fields: ctx, cAPI, mtx
-func (_m *PolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (policyengine.UpdateType, ffcapi.ErrorReason, error) {
+func (_m *PolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *apitypes.ManagedTX) (policyengine.UpdateType, policyengine.PolicyExecutionResult, ffcapi.ErrorReason, error) {
 	ret := _m.Called(ctx, cAPI, mtx)
 
 	var r0 policyengine.UpdateType
@@ -30,19 +30,26 @@ func (_m *PolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *apity
 		r0 = ret.Get(0).(policyengine.UpdateType)
 	}
 
-	var r1 ffcapi.ErrorReason
-	if rf, ok := ret.Get(1).(func(context.Context, ffcapi.API, *apitypes.ManagedTX) ffcapi.ErrorReason); ok {
+	var r1 policyengine.PolicyExecutionResult
+	if rf, ok := ret.Get(1).(func(context.Context, ffcapi.API, *apitypes.ManagedTX) policyengine.PolicyExecutionResult); ok {
 		r1 = rf(ctx, cAPI, mtx)
 	} else {
-		r1 = ret.Get(1).(ffcapi.ErrorReason)
+		r1 = ret.Get(1).(policyengine.PolicyExecutionResult)
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(context.Context, ffcapi.API, *apitypes.ManagedTX) error); ok {
+	var r2 ffcapi.ErrorReason
+	if rf, ok := ret.Get(2).(func(context.Context, ffcapi.API, *apitypes.ManagedTX) ffcapi.ErrorReason); ok {
 		r2 = rf(ctx, cAPI, mtx)
 	} else {
-		r2 = ret.Error(2)
+		r2 = ret.Get(2).(ffcapi.ErrorReason)
 	}
 
-	return r0, r1, r2
+	var r3 error
+	if rf, ok := ret.Get(3).(func(context.Context, ffcapi.API, *apitypes.ManagedTX) error); ok {
+		r3 = rf(ctx, cAPI, mtx)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }

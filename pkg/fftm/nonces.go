@@ -20,10 +20,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-transaction-manager/internal/persistence"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/apitypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/policyengine"
 )
 
 type lockedNonce struct {
@@ -86,18 +88,50 @@ func (m *manager) assignAndLockNonce(ctx context.Context, nsOpID, signer string)
 
 }
 
+func (m *manager) applyNonceHint(ctx context.Context, signer string, hint policyengine.NonceHint) {
+	log.L(ctx).Debugf("Applying nonce hint from policy engine (%d) for signer %s", hint, signer)
+	if hint == policyengine.NonceOK {
+		return
+	}
+
+	lastTxn, err := m.getMostRecentTxn(ctx, signer)
+	if err != nil {
+		return
+	}
+
+	if hint == policyengine.NonceTooLow {
+		lastTxn.Nonce = fftypes.NewFFBigInt(lastTxn.Nonce.Int64() + 1)
+	} else if hint > 0 {
+		lastTxn.Nonce = fftypes.NewFFBigInt(int64(hint))
+	}
+
+	log.L(ctx).Debugf("New nonce %d for signer %s", lastTxn.Nonce.Int64(), signer)
+}
+
+func (m *manager) getMostRecentTxn(ctx context.Context, signer string) (*apitypes.ManagedTX, error) {
+	// First we check our DB to find the last nonce we used for this address.
+	// Note we are within the nonce-lock in assignAndLockNonce for this signer, so we can be sure we're the
+	// only routine attempting this right now.
+	txns, err := m.persistence.ListTransactionsByNonce(ctx, signer, nil, 1, persistence.SortDirectionDescending)
+	if err != nil {
+		return nil, err
+	}
+	if len(txns) > 0 {
+		return txns[0], nil
+	}
+	return nil, nil
+}
+
 func (m *manager) calcNextNonce(ctx context.Context, signer string) (uint64, error) {
 
 	// First we check our DB to find the last nonce we used for this address.
 	// Note we are within the nonce-lock in assignAndLockNonce for this signer, so we can be sure we're the
 	// only routine attempting this right now.
-	var lastTxn *apitypes.ManagedTX
-	txns, err := m.persistence.ListTransactionsByNonce(ctx, signer, nil, 1, persistence.SortDirectionDescending)
+	lastTxn, err := m.getMostRecentTxn(ctx, signer)
 	if err != nil {
 		return 0, err
 	}
-	if len(txns) > 0 {
-		lastTxn = txns[0]
+	if lastTxn != nil {
 		if time.Since(*lastTxn.Created.Time()) < m.nonceStateTimeout {
 			nextNonce := lastTxn.Nonce.Uint64() + 1
 			log.L(ctx).Debugf("Allocating next nonce '%s' / '%d' after TX '%s' (status=%s)", signer, nextNonce, lastTxn.ID, lastTxn.Status)

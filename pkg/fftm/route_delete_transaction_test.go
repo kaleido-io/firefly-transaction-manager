@@ -36,7 +36,7 @@ func TestDeleteTransaction(t *testing.T) {
 
 	mpe := &policyenginemocks.PolicyEngine{}
 	m.policyEngine = mpe
-	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateDelete, ffcapi.ErrorReason(""), nil).Maybe()
+	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateDelete, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, ffcapi.ErrorReason(""), nil).Maybe()
 
 	err := m.Start()
 	assert.NoError(t, err)

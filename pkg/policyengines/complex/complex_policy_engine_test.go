@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package simple
+package complex
 
 import (
 	"context"
@@ -39,10 +39,10 @@ import (
 
 func newTestPolicyEngineFactory(t *testing.T) (*PolicyEngineFactory, config.Section) {
 	tmconfig.Reset()
-	conf := config.RootSection("unittest.simple")
+	conf := config.RootSection("unittest.complex")
 	f := &PolicyEngineFactory{}
 	f.InitConfig(conf)
-	assert.Equal(t, "simple", f.Name())
+	assert.Equal(t, "complex", f.Name())
 	return f, conf
 }
 
@@ -164,7 +164,7 @@ func TestGasOracleSendOK(t *testing.T) {
 
 	// Check cache after we close the gas station server
 	server.Close()
-	gasPrice, err := p.(*simplePolicyEngine).getGasPrice(ctx, mockFFCAPI)
+	gasPrice, err := p.(*complexPolicyEngine).getGasPrice(ctx, mockFFCAPI)
 	assert.NoError(t, err)
 	assert.NotNil(t, gasPrice)
 }
@@ -207,7 +207,7 @@ func TestConnectorGasOracleSendOK(t *testing.T) {
 	mockFFCAPI.AssertExpectations(t)
 
 	// Check cache after we close the gas station server
-	gasPrice, err := p.(*simplePolicyEngine).getGasPrice(ctx, mockFFCAPI)
+	gasPrice, err := p.(*complexPolicyEngine).getGasPrice(ctx, mockFFCAPI)
 	assert.NoError(t, err)
 	assert.NotNil(t, gasPrice)
 }

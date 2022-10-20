@@ -320,7 +320,7 @@ func TestPolicyEngineFailStaleThenUpdated(t *testing.T) {
 	m.policyEngine = mpe
 	done1 := make(chan struct{})
 	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).
-		Return(policyengine.UpdateNo, ffcapi.ErrorReason(""), fmt.Errorf("pop")).
+		Return(policyengine.UpdateNo, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, ffcapi.ErrorReason(""), fmt.Errorf("pop")).
 		Once().
 		Run(func(args mock.Arguments) {
 			close(done1)
@@ -329,7 +329,7 @@ func TestPolicyEngineFailStaleThenUpdated(t *testing.T) {
 
 	done2 := make(chan struct{})
 	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).
-		Return(policyengine.UpdateNo, ffcapi.ErrorReason(""), fmt.Errorf("pop")).
+		Return(policyengine.UpdateNo, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, ffcapi.ErrorReason(""), fmt.Errorf("pop")).
 		Once().
 		Run(func(args mock.Arguments) {
 			close(done2)
@@ -374,7 +374,7 @@ func TestExecPolicyDeleteFail(t *testing.T) {
 
 	mpe := &policyenginemocks.PolicyEngine{}
 	m.policyEngine = mpe
-	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateDelete, ffcapi.ErrorReason(""), nil).Maybe()
+	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateDelete, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, ffcapi.ErrorReason(""), nil).Maybe()
 
 	tx := genTestTxn("0xabcd1234", 12345, apitypes.TxStatusPending)
 
@@ -405,7 +405,7 @@ func TestExecPolicyDeleteInflightSync(t *testing.T) {
 
 	mpe := &policyenginemocks.PolicyEngine{}
 	m.policyEngine = mpe
-	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateDelete, ffcapi.ErrorReason(""), nil).Maybe()
+	mpe.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(policyengine.UpdateDelete, policyengine.PolicyExecutionResult{Hint: policyengine.NonceOK}, ffcapi.ErrorReason(""), nil).Maybe()
 
 	tx := genTestTxn("0xabcd1234", 12345, apitypes.TxStatusPending)
 	m.inflight = []*pendingState{{mtx: tx}}
