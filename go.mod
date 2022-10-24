@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/Masterminds/squirrel v1.5.3
 	github.com/getkin/kin-openapi v0.96.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-resty/resty/v2 v2.7.0
@@ -34,6 +35,8 @@ require (
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/invopop/yaml v0.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
+	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
