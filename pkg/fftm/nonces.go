@@ -20,12 +20,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-transaction-manager/internal/persistence"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/apitypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/policyengine"
 )
 
 type lockedNonce struct {
@@ -86,26 +84,6 @@ func (m *manager) assignAndLockNonce(ctx context.Context, nsOpID, signer string)
 		}
 	}
 
-}
-
-func (m *manager) applyNonceHint(ctx context.Context, signer string, hint policyengine.NonceHint) {
-	log.L(ctx).Debugf("Applying nonce hint from policy engine (%d) for signer %s", hint, signer)
-	if hint == policyengine.NonceOK {
-		return
-	}
-
-	lastTxn, err := m.getMostRecentTxn(ctx, signer)
-	if err != nil {
-		return
-	}
-
-	if hint == policyengine.NonceTooLow {
-		lastTxn.Nonce = fftypes.NewFFBigInt(lastTxn.Nonce.Int64() + 1)
-	} else if hint > 0 {
-		lastTxn.Nonce = fftypes.NewFFBigInt(int64(hint))
-	}
-
-	log.L(ctx).Debugf("New nonce %d for signer %s", lastTxn.Nonce.Int64(), signer)
 }
 
 func (m *manager) getMostRecentTxn(ctx context.Context, signer string) (*apitypes.ManagedTX, error) {

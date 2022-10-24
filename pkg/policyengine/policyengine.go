@@ -39,8 +39,7 @@ type PolicyExecutionResult struct {
 }
 
 const (
-	NonceOK     NonceHint = -1
-	NonceTooLow NonceHint = -2
+	NonceOK NonceHint = -1
 )
 
 type PolicyEngine interface {
