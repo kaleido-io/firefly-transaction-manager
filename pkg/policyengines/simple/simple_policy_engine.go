@@ -42,6 +42,23 @@ func (f *PolicyEngineFactory) Name() string {
 	return "simple"
 }
 
+const (
+	// TxSubStatusSigning indicates the operation has been sent for signing
+	TxSubStatusGetGasPrice apitypes.TxSubStatus = "RetrievedGasPrice"
+	// TxSubStatusSubmitted indicates that the transaction has been submitted to the JSON/RPC endpoint
+	TxSubStatusSubmitted apitypes.TxSubStatus = "Submitted"
+)
+
+func addSubStatus(mtx *apitypes.ManagedTX, subStatus apitypes.TxSubStatus) {
+	newStatus := &apitypes.TxSubStatusEntry{
+		Time:           fftypes.Now(),
+		LastOccurrence: fftypes.Now(),
+		Count:          1,
+		Status:         subStatus,
+	}
+	mtx.SubStatusHistory = append(mtx.SubStatusHistory, newStatus)
+}
+
 // simplePolicyEngine is a base policy engine forming an example for extension:
 // - It uses a public gas estimation
 // - It submits the transaction once
@@ -161,10 +178,12 @@ func (p *simplePolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *
 		if err != nil {
 			return policyengine.UpdateNo, "", err
 		}
+		addSubStatus(mtx, TxSubStatusGetGasPrice)
 		// Submit the first time
 		if reason, err := p.submitTX(ctx, cAPI, mtx); err != nil {
 			return policyengine.UpdateYes, reason, err
 		}
+		addSubStatus(mtx, TxSubStatusSubmitted)
 		mtx.FirstSubmit = mtx.LastSubmit
 		return policyengine.UpdateYes, "", nil
 
@@ -193,6 +212,7 @@ func (p *simplePolicyEngine) Execute(ctx context.Context, cAPI ffcapi.API, mtx *
 						return policyengine.UpdateYes, reason, err
 					}
 				}
+				addSubStatus(mtx, TxSubStatusSubmitted)
 				return policyengine.UpdateYes, "", nil
 			}
 			return policyengine.UpdateNo, "", nil

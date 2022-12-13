@@ -45,6 +45,16 @@ type ManagedTXUpdate struct {
 	MappedReason   ffcapi.ErrorReason `json:"reason,omitempty"`
 }
 
+// TxSubStatus is an intermediate status a transaction may go through
+type TxSubStatus string
+
+type TxSubStatusEntry struct {
+	Time           *fftypes.FFTime `json:"time"`
+	LastOccurrence *fftypes.FFTime `json:"lastOccurrence"`
+	Status         TxSubStatus     `json:"subStatus"`
+	Count          int             `json:"count"`
+}
+
 // MsgString is assured to be the same, as long as the type/message is the same.
 // Does not change if the count/times are different - so allows comparison.
 func (mtu *ManagedTXUpdate) MsgString() string {
@@ -98,6 +108,7 @@ type ManagedTX struct {
 	Receipt            *ffcapi.TransactionReceiptResponse `json:"receipt,omitempty"`
 	ErrorMessage       string                             `json:"errorMessage,omitempty"`
 	History            []*ManagedTXUpdate                 `json:"history"`
+	SubStatusHistory   []*TxSubStatusEntry                `json:"subStatusHistory"`
 	Confirmations      []confirmations.BlockInfo          `json:"confirmations,omitempty"`
 }
 
