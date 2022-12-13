@@ -318,25 +318,29 @@ func (m *manager) execPolicy(ctx context.Context, pending *pendingState, syncDel
 		pending.remove = true // for the next time round the loop
 		m.markInflightStale()
 	}
-	m.sendWSReply(mtx)
+	// if and only if the transaction is now resolved send web a socket update
+	if mtx.Status == apitypes.TxStatusSucceeded || mtx.Status == apitypes.TxStatusFailed {
+		m.sendWSReply(mtx)
+	}
 
 	return nil
 }
 
 func (m *manager) sendWSReply(mtx *apitypes.ManagedTX) {
 	wsr := &apitypes.TransactionUpdateReply{
-		ManagedTX: *mtx,
 		Headers: apitypes.ReplyHeaders{
 			RequestID: mtx.ID,
 		},
+		Status:          mtx.Status,
+		TransactionHash: mtx.TransactionHash,
 	}
+	wsr.ProtocolID = ffcapi.ProtocolIDForReceipt(mtx.Receipt)
+
 	switch mtx.Status {
 	case apitypes.TxStatusSucceeded:
 		wsr.Headers.Type = apitypes.TransactionUpdateSuccess
 	case apitypes.TxStatusFailed:
 		wsr.Headers.Type = apitypes.TransactionUpdateFailure
-	default:
-		wsr.Headers.Type = apitypes.TransactionUpdate
 	}
 	// Notify on the websocket - this is best-effort (there is no subscription/acknowledgement)
 	m.wsServer.SendReply(wsr)
