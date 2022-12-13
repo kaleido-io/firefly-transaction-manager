@@ -45,6 +45,16 @@ type ManagedTXUpdate struct {
 	MappedReason   ffcapi.ErrorReason `json:"reason,omitempty"`
 }
 
+// TxSubStatus is an intermediate status a transaction may go through
+type TxSubStatus string
+
+type TxSubStatusEntry struct {
+	Time           *fftypes.FFTime `json:"time"`
+	LastOccurrence *fftypes.FFTime `json:"lastOccurrence"`
+	Status         TxSubStatus     `json:"subStatus"`
+	Count          int             `json:"count"`
+}
+
 // MsgString is assured to be the same, as long as the type/message is the same.
 // Does not change if the count/times are different - so allows comparison.
 func (mtu *ManagedTXUpdate) MsgString() string {
@@ -65,14 +75,15 @@ func (mtu *ManagedTXUpdate) MsgString() string {
 // ManagedTX is the structure stored for each new transaction request, using the external ID of the operation
 //
 // Indexing:
-//   Multiple index collection are stored for the managed transactions, to allow them to be managed including:
 //
-//   - Nonce allocation: this is a critical index, and why cleanup is so important (mentioned below).
-//     We use this index to determine the next nonce to assign to a given signing key.
-//   - Created time: a timestamp ordered index for the transactions for convenient ordering.
-//     the key includes the ID of the TX for uniqueness.
-//   - Pending sequence: An entry in this index only exists while the transaction is pending, and is
-//     ordered by a UUIDv1 sequence allocated to each entry.
+//	Multiple index collection are stored for the managed transactions, to allow them to be managed including:
+//
+//	- Nonce allocation: this is a critical index, and why cleanup is so important (mentioned below).
+//	  We use this index to determine the next nonce to assign to a given signing key.
+//	- Created time: a timestamp ordered index for the transactions for convenient ordering.
+//	  the key includes the ID of the TX for uniqueness.
+//	- Pending sequence: An entry in this index only exists while the transaction is pending, and is
+//	  ordered by a UUIDv1 sequence allocated to each entry.
 //
 // Index cleanup after partial write:
 //   - All indexes are stored before the TX itself.
@@ -97,6 +108,7 @@ type ManagedTX struct {
 	Receipt            *ffcapi.TransactionReceiptResponse `json:"receipt,omitempty"`
 	ErrorMessage       string                             `json:"errorMessage,omitempty"`
 	History            []*ManagedTXUpdate                 `json:"history"`
+	SubStatusHistory   []*TxSubStatusEntry                `json:"subStatusHistory"`
 	Confirmations      []confirmations.BlockInfo          `json:"confirmations,omitempty"`
 }
 
