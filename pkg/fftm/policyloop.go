@@ -243,7 +243,7 @@ func (m *manager) execPolicy(ctx context.Context, pending *pendingState, syncDel
 	m.mux.Lock()
 	mtx := pending.mtx
 	confirmed := pending.confirmed
-	receipt := ffcapi.ProtocolIDForReceipt(mtx.Receipt)
+	mtx.Receipt.ProtocolID = ffcapi.ProtocolIDForReceipt(mtx.Receipt)
 	if syncDeleteRequest && mtx.DeleteRequested == nil {
 		mtx.DeleteRequested = fftypes.Now()
 	}
@@ -253,10 +253,10 @@ func (m *manager) execPolicy(ctx context.Context, pending *pendingState, syncDel
 	var updateReason ffcapi.ErrorReason
 	var updateInfo string
 	switch {
-	case receipt != "" && confirmed && !syncDeleteRequest:
+	case mtx.Receipt.ProtocolID != "" && confirmed && !syncDeleteRequest:
 		update = policyengine.UpdateYes
 		completed = true
-		updateInfo = fmt.Sprintf("Success=%t,Receipt=%s,Confirmations=%d,Hash=%s", mtx.Receipt.Success, receipt, len(mtx.Confirmations), mtx.TransactionHash)
+		updateInfo = fmt.Sprintf("Success=%t,Receipt=%s,Confirmations=%d,Hash=%s", mtx.Receipt.Success, mtx.Receipt.ProtocolID, len(mtx.Confirmations), mtx.TransactionHash)
 		if pending.mtx.Receipt.Success {
 			mtx.Status = apitypes.TxStatusSucceeded
 		} else {
@@ -277,7 +277,7 @@ func (m *manager) execPolicy(ctx context.Context, pending *pendingState, syncDel
 				log.L(ctx).Errorf("Policy engine returned error for transaction %s reason=%s: %s", mtx.ID, updateReason, err)
 				update = policyengine.UpdateYes
 			} else {
-				updateInfo = fmt.Sprintf("Submitted=%t,Receipt=%s,Hash=%s", mtx.FirstSubmit != nil, receipt, mtx.TransactionHash)
+				updateInfo = fmt.Sprintf("Submitted=%t,Receipt=%s,Hash=%s", mtx.FirstSubmit != nil, mtx.Receipt.ProtocolID, mtx.TransactionHash)
 				log.L(ctx).Debugf("Policy engine executed for tx %s (update=%d,status=%s,hash=%s)", mtx.ID, update, mtx.Status, mtx.TransactionHash)
 				if mtx.FirstSubmit != nil && pending.trackingTransactionHash != mtx.TransactionHash {
 					// If now submitted, add to confirmations manager for receipt checking
@@ -334,7 +334,7 @@ func (m *manager) sendWSReply(mtx *apitypes.ManagedTX) {
 		Status:          mtx.Status,
 		TransactionHash: mtx.TransactionHash,
 	}
-	wsr.ProtocolID = ffcapi.ProtocolIDForReceipt(mtx.Receipt)
+	wsr.ProtocolID = mtx.Receipt.ProtocolID
 
 	switch mtx.Status {
 	case apitypes.TxStatusSucceeded:
