@@ -105,10 +105,6 @@ type manager struct {
 func InitConfig() {
 	tmconfig.Reset()
 	events.InitDefaults()
-
-	if config.GetBool(tmconfig.MetricsEnabled) {
-		metrics.Registry()
-	}
 }
 
 func NewManager(ctx context.Context, connector ffcapi.API) (Manager, error) {

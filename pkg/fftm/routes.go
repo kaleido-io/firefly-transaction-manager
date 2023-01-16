@@ -47,5 +47,6 @@ func (m *manager) routes() []*ffapi.Route {
 		postSubscriptionReset(m),
 		postSubscriptions(m),
 		getAddressBalance(m),
+		getGasPrice(m),
 	}
 }

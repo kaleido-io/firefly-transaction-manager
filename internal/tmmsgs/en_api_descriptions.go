@@ -52,6 +52,7 @@ var (
 	APIEndpointPatchEventStreamListener     = ffm("api.endpoints.patch.eventstream.listener", "Update event stream listener")
 	APIEndpointDeleteEventStreamListener    = ffm("api.endpoints.delete.eventstream.listener", "Delete event stream listener")
 	APIEndpointGetAddressBalance            = ffm("api.endpoints.get.address.balance", "Get gas token balance for a signer address")
+	APIEndpointGetGasPrice                  = ffm("api.endpoints.get.gasprice", "Get the current gas price of the connector's chain")
 
 	APIParamStreamID      = ffm("api.params.streamId", "Event Stream ID")
 	APIParamListenerID    = ffm("api.params.listenerId", "Listener ID")

@@ -133,6 +133,10 @@ type LiveAddressBalance struct {
 	ffcapi.AddressBalanceResponse
 }
 
+type LiveGasPrice struct {
+	ffcapi.GasPriceEstimateResponse
+}
+
 // CheckUpdateString helper merges supplied configuration, with a base, and applies a default if unset
 func CheckUpdateString(changed bool, merged **string, old *string, new *string, defValue string) bool {
 	if new != nil {

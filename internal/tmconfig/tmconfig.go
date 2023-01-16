@@ -110,6 +110,10 @@ func setDefaults() {
 	viper.SetDefault(string(MetricsPath), "/metrics")
 }
 
+type TMConfig interface {
+	Reset()
+}
+
 func Reset() {
 	config.RootConfigReset(setDefaults)
 
