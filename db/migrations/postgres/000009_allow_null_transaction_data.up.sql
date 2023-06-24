@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE transactions ALTER COLUMN tx_data DROP NOT NULL;
+
+COMMIT;
