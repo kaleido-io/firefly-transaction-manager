@@ -86,10 +86,6 @@ func (rp *receiptProcessor) loop(ctx context.Context) {
 			return
 		}
 		rp.run(ctx)
-		if rp.readyForRemoval {
-			// process finished
-			return
-		}
 		timeoutChannel = time.After(rp.rc.bcm.staleReceiptTimeout)
 	}
 
@@ -102,7 +98,8 @@ func (rp *receiptProcessor) run(ctx context.Context) {
 	err := rp.rc.bcm.retry.Do(ctx, "receipt check", func(_ int) (bool, error) {
 		startTime := time.Now()
 		pending := rp.pendingItem
-		res, reason, receiptErr := rp.rc.bcm.connector.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
+		ctxWithTimeout, _ := context.WithTimeout(ctx, rp.rc.bcm.staleReceiptTimeout)
+		res, reason, receiptErr := rp.rc.bcm.connector.TransactionReceipt(ctxWithTimeout, &ffcapi.TransactionReceiptRequest{
 			TransactionHash: pending.transactionHash,
 		})
 		if receiptErr != nil || res == nil {
