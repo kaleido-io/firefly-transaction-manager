@@ -17,7 +17,6 @@
 package confirmations
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"sort"
@@ -149,8 +148,7 @@ type pendingItem struct {
 	confirmations         []*apitypes.Confirmation
 	scheduledAtLeastOnce  bool
 	confirmed             bool
-	queuedStale           *list.Element // protected by receiptChecker mux
-	lastReceiptCheck      time.Time     // protected by receiptChecker mux
+	lastReceiptCheck      time.Time // protected by receiptChecker mux
 	receiptCallback       func(ctx context.Context, receipt *ffcapi.TransactionReceiptResponse)
 	confirmationsCallback func(ctx context.Context, notification *apitypes.ConfirmationsNotification)
 	transactionHash       string
@@ -445,10 +443,10 @@ func (bcm *blockConfirmationManager) scheduleReceiptChecks(receivedBlocksFirstTi
 		// check within the receipt checker
 		if pending.pType == pendingTypeTransaction {
 			if receivedBlocksFirstTime && !pending.scheduledAtLeastOnce {
-				bcm.receiptChecker.schedule(pending, false)
+				bcm.receiptChecker.schedule(pending)
 			} else if now.Sub(pending.lastReceiptCheck) > bcm.staleReceiptTimeout {
 				// schedule stale receipt checks
-				bcm.receiptChecker.schedule(pending, true /* suspected timeout - prompts re-check in the lock */)
+				bcm.receiptChecker.schedule(pending)
 			}
 		}
 	}
@@ -469,7 +467,7 @@ func (bcm *blockConfirmationManager) processNotifications(notifications []*Notif
 			newItem := n.transactionPendingItem()
 			bcm.addOrReplaceItem(newItem)
 			if bcm.fetchReceiptUponEntry {
-				bcm.receiptChecker.schedule(newItem, false)
+				bcm.receiptChecker.schedule(newItem)
 			}
 		case RemovedEventLog:
 			bcm.removeItem(n.eventPendingItem(), true)
@@ -581,7 +579,7 @@ func (bcm *blockConfirmationManager) processBlock(block *apitypes.BlockInfo) {
 		if pending, ok := bcm.pending[txKey]; ok {
 			if pending.blockHash != block.BlockHash {
 				l.Infof("Detected transaction %s added to block %d / %s - receipt check scheduled", txHash, block.BlockNumber, block.BlockHash)
-				bcm.receiptChecker.schedule(pending, false)
+				bcm.receiptChecker.schedule(pending)
 			}
 		}
 	}
