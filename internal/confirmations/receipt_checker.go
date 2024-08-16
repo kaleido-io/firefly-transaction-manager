@@ -51,7 +51,6 @@ type receiptProcessor struct {
 	closed             chan bool
 	maxConcurrencySlot chan bool
 	pendingItem        *pendingItem
-	readyForRemoval    bool
 }
 
 func (rp *receiptProcessor) queueProcessRequest() {
@@ -98,7 +97,7 @@ func (rp *receiptProcessor) run(ctx context.Context) {
 	err := rp.rc.bcm.retry.Do(ctx, "receipt check", func(_ int) (bool, error) {
 		startTime := time.Now()
 		pending := rp.pendingItem
-		ctxWithTimeout, _ := context.WithTimeout(ctx, rp.rc.bcm.staleReceiptTimeout)
+		ctxWithTimeout, _ := context.WithTimeout(ctx, 1*time.Second)
 		res, reason, receiptErr := rp.rc.bcm.connector.TransactionReceipt(ctxWithTimeout, &ffcapi.TransactionReceiptRequest{
 			TransactionHash: pending.transactionHash,
 		})
