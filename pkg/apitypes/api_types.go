@@ -373,14 +373,28 @@ type EventBatchWithConfirm struct {
 	Confirm chan error
 }
 
+type ConfirmationContext struct {
+	ConfirmationsNotification
+	CurrentConfirmationCount int `json:"currentConfirmationCount"` // the current number of confirmations for this event
+	TargetConfirmationCount  int `json:"targetConfirmationCount"`  // the target number of confirmations for this event
+}
+
+// ListenerEvent is an event+checkpoint for a particular listener, and is the object delivered over the event stream channel when
+// a new event is detected for delivery to the confirmation manager.
+type ConfirmationsForListenerEvent struct {
+	ConfirmationContext
+	Event *ffcapi.ListenerEvent `json:"event"` // the event that the confirmations are for
+}
+
 // EventWithContext is what is delivered
 // There is custom serialization to flatten the whole structure, so all the custom `info` fields from the
 // connector are alongside the required context fields.
 // The `data` is kept separate
 type EventWithContext struct {
-	StandardContext EventContext
-	Event           *ffcapi.Event
-	BlockEvent      *ffcapi.BlockEvent
+	StandardContext     EventContext
+	ConfirmationContext *ConfirmationContext // this is the context for confirmations, if any
+	Event               *ffcapi.Event
+	BlockEvent          *ffcapi.BlockEvent
 }
 
 func (e *EventWithContext) MarshalJSON() ([]byte, error) {
@@ -433,12 +447,12 @@ func ConfirmationFromBlock(block *BlockInfo) *Confirmation {
 
 type ConfirmationsNotification struct {
 	// Confirmed marks we've reached the confirmation threshold
-	Confirmed bool
+	Confirmed bool `json:"confirmed,omitempty"`
 	// NewFork is true when NewConfirmations is a complete list of confirmations.
 	// Otherwise, Confirmations is an additive delta on top of a previous list of confirmations.
-	NewFork bool
+	NewFork bool `json:"newFork,omitempty"`
 	// Confirmations is the list of confirmations being notified - assured to be non-nil, but might be empty.
-	Confirmations []*Confirmation
+	Confirmations []*Confirmation `json:"confirmations,omitempty"`
 }
 
 type Confirmation struct {

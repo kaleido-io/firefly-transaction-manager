@@ -409,11 +409,11 @@ func TestProcessBlockHashesSwallowsFailure(t *testing.T) {
 func TestDispatchAllConfirmedNonBlocking(t *testing.T) {
 	bcm, _ := newTestBlockConfirmationManager()
 	cbl := &confirmedBlockListener{
-		id:            fftypes.NewUUID(),
-		ctx:           bcm.ctx,
-		bcm:           bcm,
-		processorDone: make(chan struct{}),
-		eventStream:   make(chan<- *ffcapi.ListenerEvent), // blocks indefinitely
+		id:                      fftypes.NewUUID(),
+		ctx:                     bcm.ctx,
+		bcm:                     bcm,
+		processorDone:           make(chan struct{}),
+		blockEventOutputChannel: make(chan<- *ffcapi.ListenerEvent), // blocks indefinitely
 	}
 
 	cbl.requiredConfirmations = 0
@@ -423,7 +423,7 @@ func TestDispatchAllConfirmedNonBlocking(t *testing.T) {
 	waitForDispatchReturn := make(chan struct{})
 	go func() {
 		defer close(waitForDispatchReturn)
-		cbl.dispatchAllConfirmed()
+		cbl.dispatchEventsToOutputChannel()
 	}()
 
 	bcm.cancelFunc()

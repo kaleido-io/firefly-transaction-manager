@@ -94,7 +94,6 @@ type startedStreamState struct {
 	updates           chan *ffcapi.ListenerEvent
 	blocks            chan *ffcapi.BlockHashEvent
 }
-
 type eventStream struct {
 	bgCtx                 context.Context
 	spec                  *apitypes.EventStream
@@ -109,7 +108,7 @@ type eventStream struct {
 	retry                 *retry.Retry
 	currentState          *startedStreamState
 	checkpointInterval    time.Duration
-	batchChannel          chan *ffcapi.ListenerEvent
+	eventBatchChannel     chan *ffcapi.ListenerEvent
 	batchNumber           atomic.Int64
 	apiManagedStream      bool
 	apiManagedRunLock     sync.Mutex
@@ -183,7 +182,9 @@ func newEventStream(
 	if es.spec, _, err = mergeValidateEsConfig(esCtx, apiManagedStream, nil, spec); err != nil {
 		return nil, err
 	}
-	es.batchChannel = make(chan *ffcapi.ListenerEvent, *es.spec.BatchSize)
+
+	es.eventBatchChannel = make(chan *ffcapi.ListenerEvent, *es.spec.BatchSize)
+
 	for _, existing := range initialListeners {
 		spec, err := es.verifyListenerOptions(esCtx, existing.ID, existing)
 		if err != nil {
@@ -470,7 +471,7 @@ func (es *eventStream) AddOrUpdateListener(ctx context.Context, id *fftypes.UUID
 		}
 	} else if isNew && startedState != nil {
 		if l.spec.Type != nil && *l.spec.Type == apitypes.ListenerTypeBlocks {
-			return spec, l.es.confirmations.StartConfirmedBlockListener(ctx, l.spec.ID, *l.spec.FromBlock, nil /* new so no checkpoint */, es.batchChannel)
+			return spec, l.es.confirmations.StartConfirmedBlockListener(ctx, l.spec.ID, *l.spec.FromBlock, nil /* new so no checkpoint */, es.eventBatchChannel)
 		}
 		// Start the new listener - no checkpoint needed here
 		return spec, l.start(startedState, nil)
@@ -628,7 +629,7 @@ func (es *eventStream) start(ctx context.Context, apiManagedCheckpoint *apitypes
 	// Add all the block listeners
 	for _, bl := range initialBlockListeners {
 		// blocks go straight to the batch assembler, as they're already pre-handled by the confirmation manager
-		if err := es.confirmations.StartConfirmedBlockListener(startedState.ctx, bl.ListenerID, bl.FromBlock, bl.Checkpoint, es.batchChannel); err != nil {
+		if err := es.confirmations.StartConfirmedBlockListener(startedState.ctx, bl.ListenerID, bl.FromBlock, bl.Checkpoint, es.eventBatchChannel); err != nil {
 			// There are no known reasons for this to fail, as we're starting a fresh set of listeners
 			log.L(startedState.ctx).Errorf("Failed to start block listener: %s", err)
 			return nil, err
@@ -737,7 +738,7 @@ func (es *eventStream) processNewEvent(ctx context.Context, fev *ffcapi.Listener
 			// Updates that are just a checkpoint update, go straight to the batch loop.
 			// Or if the confirmation manager is disabled.
 			// - Note this will block the eventLoop when the event stream is blocked
-			es.batchChannel <- fev
+			es.eventBatchChannel <- fev
 		} else {
 			// Notify will block, when the confirmation manager is blocked, which per below
 			// will flow back from when the event stream is blocked
@@ -750,7 +751,7 @@ func (es *eventStream) processNewEvent(ctx context.Context, fev *ffcapi.Listener
 							// Push it to the batch when confirmed
 							// - Note this will block the confirmation manager when the event stream is blocked
 							log.L(ctx).Debugf("Queuing confirmed event for batch assembly: '%s'", event)
-							es.batchChannel <- fev
+							es.eventBatchChannel <- fev
 						}
 					},
 				},
@@ -795,7 +796,7 @@ func (es *eventStream) eventLoop(startedState *startedStreamState) {
 	}
 }
 
-func (es *eventStream) checkConfirmedEventForBatch(e *ffcapi.ListenerEvent) (l *listener, ewc *apitypes.EventWithContext) {
+func (es *eventStream) convertListenerEventForBatchOutput(e *ffcapi.ListenerEvent) (l *listener, ewc *apitypes.EventWithContext) {
 	var eToLog fmt.Stringer
 	var listenerID *fftypes.UUID
 	switch {
@@ -837,7 +838,7 @@ func (es *eventStream) checkConfirmedEventForBatch(e *ffcapi.ListenerEvent) (l *
 			},
 			Event: e.Event,
 		}
-		log.L(es.bgCtx).Debugf("%s '%s' event confirmed: %s", l.spec.ID, l.spec.SignatureString(), e.Event)
+		log.L(es.bgCtx).Debugf("%s '%s' event confirmed: %s", l.spec.ID, l.spec.SignatureString(), eToLog)
 	} else {
 		ewc = &apitypes.EventWithContext{
 			StandardContext: apitypes.EventContext{
@@ -848,7 +849,7 @@ func (es *eventStream) checkConfirmedEventForBatch(e *ffcapi.ListenerEvent) (l *
 			},
 			BlockEvent: e.BlockEvent,
 		}
-		log.L(es.bgCtx).Debugf("%s '%s' block event confirmed: %s", l.spec.ID, l.spec.SignatureString(), e.Event)
+		log.L(es.bgCtx).Debugf("%s '%s' block event confirmed: %s", l.spec.ID, l.spec.SignatureString(), eToLog)
 	}
 	return l, ewc
 }
@@ -883,7 +884,7 @@ func (es *eventStream) checkStartedStopCheckpointMismatch(ctx context.Context, c
 // Note the checkpointInterval will determine how often this function exits when
 // no events have arrived (with the latest checkpoint) so that the checkpoint can
 // be written for restart recovery by the caller of this function.
-func (es *eventStream) PollAPIMangedStream(ctx context.Context, checkpointIn *apitypes.EventStreamCheckpoint, timeout time.Duration) (events []*apitypes.EventWithContext, checkpointOut *apitypes.EventStreamCheckpoint, err error) {
+func (es *eventStream) PollAPIManagedStream(ctx context.Context, checkpointIn *apitypes.EventStreamCheckpoint, timeout time.Duration) (events []*apitypes.EventWithContext, checkpointOut *apitypes.EventStreamCheckpoint, err error) {
 	// Must only have a single poll active at any given time.
 	// This lock is only taken in this function, and is taken BEFORE the es.mux (which we hold more briefly)
 	es.apiManagedRunLock.Lock()
@@ -941,8 +942,8 @@ func (es *eventStream) batchPoll(ctx context.Context, pollTimer *time.Timer) (ba
 		}
 		timedOut := false
 		select {
-		case fev := <-es.batchChannel:
-			l, ewc := es.checkConfirmedEventForBatch(fev)
+		case fev := <-es.eventBatchChannel:
+			l, ewc := es.convertListenerEventForBatchOutput(fev)
 			if l != nil && ewc != nil {
 				if batch == nil {
 					batch = &eventStreamBatch{
@@ -963,6 +964,9 @@ func (es *eventStream) batchPoll(ctx context.Context, pollTimer *time.Timer) (ba
 			return nil, i18n.NewError(ctx, i18n.MsgContextCanceled)
 		}
 		if timedOut || (batch != nil && len(batch.events) >= maxSize) {
+			if batch != nil {
+				log.L(ctx).Debugf("Batch %d completed with %d events", batch.number, len(batch.events))
+			}
 			return batch, nil // batch will be nil here on checkpoint timeout
 		}
 	}

@@ -43,45 +43,50 @@ import (
 // This implementation is thus deliberately simple assuming that when instability is found
 // in the notifications it can simply wipe out its view and start again.
 type confirmedBlockListener struct {
-	bcm                   *blockConfirmationManager
-	ctx                   context.Context
-	cancelFunc            func()
-	id                    *fftypes.UUID
-	stateLock             sync.Mutex
-	fromBlock             uint64
-	waitingForFromBlock   bool
-	rollingCheckpoint     *ffcapi.BlockListenerCheckpoint
-	blocksSinceCheckpoint []*apitypes.BlockInfo
-	newHeadToAdd          []*apitypes.BlockInfo // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
-	newBlockHashes        chan *ffcapi.BlockHashEvent
-	dispatcherTap         chan struct{}
-	eventStream           chan<- *ffcapi.ListenerEvent
-	connector             ffcapi.API
-	requiredConfirmations int
-	retry                 *retry.Retry
-	processorDone         chan struct{}
-	dispatcherDone        chan struct{}
+	bcm                     *blockConfirmationManager
+	ctx                     context.Context
+	cancelFunc              func()
+	id                      *fftypes.UUID
+	stateLock               sync.Mutex
+	fromBlock               uint64
+	waitingForFromBlock     bool
+	rollingCheckpoint       *ffcapi.BlockListenerCheckpoint
+	blocksSinceCheckpoint   []*apitypes.BlockInfo
+	newHeadToAdd            []*apitypes.BlockInfo // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
+	newBlockHashes          chan *ffcapi.BlockHashEvent
+	dispatcherTap           chan struct{}
+	blockEventOutputChannel chan<- *ffcapi.ListenerEvent
+	connector               ffcapi.API
+	requiredConfirmations   int
+	retry                   *retry.Retry
+	processorDone           chan struct{}
+	dispatcherDone          chan struct{}
 }
 
 func (bcm *blockConfirmationManager) StartConfirmedBlockListener(ctx context.Context, id *fftypes.UUID, fromBlock string, checkpoint *ffcapi.BlockListenerCheckpoint, eventStream chan<- *ffcapi.ListenerEvent) error {
-	_, err := bcm.startConfirmedBlockListener(ctx, id, fromBlock, checkpoint, eventStream)
+	_, err := bcm.startConfirmedBlockListener(ctx, id, fromBlock, checkpoint, eventStream, nil)
 	return err
 }
 
-func (bcm *blockConfirmationManager) startConfirmedBlockListener(fgCtx context.Context, id *fftypes.UUID, fromBlock string, checkpoint *ffcapi.BlockListenerCheckpoint, eventStream chan<- *ffcapi.ListenerEvent) (cbl *confirmedBlockListener, err error) {
+func (bcm *blockConfirmationManager) startConfirmedBlockListener(fgCtx context.Context, id *fftypes.UUID, fromBlock string, checkpoint *ffcapi.BlockListenerCheckpoint, blockEventOutputChannel chan<- *ffcapi.ListenerEvent) (cbl *confirmedBlockListener, err error) { //nolint:unparam
+
+	if blockEventOutputChannel == nil {
+		return nil, i18n.NewError(fgCtx, tmmsgs.MsgBlockListenerNoOutputChannel)
+	}
+
 	cbl = &confirmedBlockListener{
 		bcm: bcm,
 		// We need our own listener for each confirmed block stream, and the bcm has to fan out
-		newBlockHashes:        make(chan *ffcapi.BlockHashEvent, config.GetInt(tmconfig.ConfirmationsBlockQueueLength)),
-		dispatcherTap:         make(chan struct{}, 1),
-		id:                    id,
-		eventStream:           eventStream,
-		requiredConfirmations: bcm.requiredConfirmations,
-		connector:             bcm.connector,
-		retry:                 bcm.retry,
-		rollingCheckpoint:     checkpoint,
-		processorDone:         make(chan struct{}),
-		dispatcherDone:        make(chan struct{}),
+		newBlockHashes:          make(chan *ffcapi.BlockHashEvent, config.GetInt(tmconfig.ConfirmationsBlockQueueLength)),
+		dispatcherTap:           make(chan struct{}, 1),
+		id:                      id,
+		blockEventOutputChannel: blockEventOutputChannel,
+		requiredConfirmations:   bcm.requiredConfirmations,
+		connector:               bcm.connector,
+		retry:                   bcm.retry,
+		rollingCheckpoint:       checkpoint,
+		processorDone:           make(chan struct{}),
+		dispatcherDone:          make(chan struct{}),
 	}
 	cbl.ctx, cbl.cancelFunc = context.WithCancel(bcm.ctx)
 	// add a log context for this specific confirmation manager (as there are many within the )
@@ -252,7 +257,7 @@ func (cbl *confirmedBlockListener) dispatcher() {
 			// spin getting blocks until we it looks like we need to wait for a notification
 			lastFromNotification := false
 			for cbl.readNextBlock(&lastFromNotification) {
-				cbl.dispatchAllConfirmed()
+				cbl.dispatchEventsToOutputChannel()
 			}
 		}
 
@@ -342,39 +347,49 @@ func (cbl *confirmedBlockListener) readNextBlock(lastFromNotification *bool) (fo
 
 }
 
-func (cbl *confirmedBlockListener) dispatchAllConfirmed() {
-	for {
-		var toDispatch *ffcapi.ListenerEvent
-		cbl.stateLock.Lock()
-		if len(cbl.blocksSinceCheckpoint) > cbl.requiredConfirmations {
-			block := cbl.blocksSinceCheckpoint[0]
-			// don't want memory to grow indefinitely by shifting right, so we create a new slice here
-			cbl.blocksSinceCheckpoint = append([]*apitypes.BlockInfo{}, cbl.blocksSinceCheckpoint[1:]...)
+func (cbl *confirmedBlockListener) dispatchEventsToOutputChannel() {
+	cbl.stateLock.Lock()
+
+	totalBlocks := len(cbl.blocksSinceCheckpoint)
+	earliestUncomfirmedBlockIndex := totalBlocks - cbl.requiredConfirmations
+	if earliestUncomfirmedBlockIndex < 0 {
+		earliestUncomfirmedBlockIndex = 0
+	}
+
+	for i, block := range cbl.blocksSinceCheckpoint {
+		cbEvent := &ffcapi.ListenerEvent{
+			BlockEvent: &ffcapi.BlockEvent{
+				ListenerID: cbl.id,
+				BlockInfo: ffcapi.BlockInfo{
+					//nolint:gosec
+					BlockNumber:       fftypes.NewFFBigInt(int64(block.BlockNumber)),
+					BlockHash:         block.BlockHash,
+					ParentHash:        block.ParentHash,
+					TransactionHashes: block.TransactionHashes,
+				},
+			},
+			Checkpoint: cbl.rollingCheckpoint,
+		}
+		if i < earliestUncomfirmedBlockIndex || cbl.requiredConfirmations == 0 { // check whether the correct block is confirmed
+			// this block is confirmed
+			toDispatch := &apitypes.ConfirmationsForListenerEvent{
+				Event: cbEvent,
+			}
 			cbl.rollingCheckpoint = &ffcapi.BlockListenerCheckpoint{
 				Block: block.BlockNumber.Uint64(),
 			}
-			toDispatch = &ffcapi.ListenerEvent{
-				BlockEvent: &ffcapi.BlockEvent{
-					ListenerID: cbl.id,
-					BlockInfo: ffcapi.BlockInfo{
-						//nolint:gosec
-						BlockNumber:       fftypes.NewFFBigInt(int64(block.BlockNumber)),
-						BlockHash:         block.BlockHash,
-						ParentHash:        block.ParentHash,
-						TransactionHashes: block.TransactionHashes,
-					},
-				},
-				Checkpoint: cbl.rollingCheckpoint,
+			// for confirmed blocks we always set the checkpoint to the current rolling checkpoint
+			cbEvent.Checkpoint = cbl.rollingCheckpoint
+			log.L(cbl.ctx).Infof("Dispatching block %d/%s", toDispatch.Event.BlockEvent.BlockNumber.Uint64(), toDispatch.Event.BlockEvent.BlockHash)
+			select {
+			case cbl.blockEventOutputChannel <- toDispatch.Event:
+			case <-cbl.ctx.Done():
 			}
-		}
-		cbl.stateLock.Unlock()
-		if toDispatch == nil {
-			return
-		}
-		log.L(cbl.ctx).Infof("Dispatching block %d/%s", toDispatch.BlockEvent.BlockNumber.Uint64(), toDispatch.BlockEvent.BlockHash)
-		select {
-		case cbl.eventStream <- toDispatch:
-		case <-cbl.ctx.Done():
+		} else {
+			log.L(cbl.ctx).Tracef("Block %d/%s is not confirmed", cbEvent.BlockEvent.BlockNumber.Uint64(), cbEvent.BlockEvent.BlockHash)
 		}
 	}
+	// removed the confirmed blocks from the list as they've been dispatched
+	cbl.blocksSinceCheckpoint = append([]*apitypes.BlockInfo{}, cbl.blocksSinceCheckpoint[earliestUncomfirmedBlockIndex:]...)
+	cbl.stateLock.Unlock()
 }

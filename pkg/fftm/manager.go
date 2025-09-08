@@ -50,7 +50,7 @@ type Manager interface {
 	APIRouter() *mux.Router
 
 	// API managed event streams have checkpoints stored externally.
-	// Events are access by calling PollAPIMangedStream() on the returned stream.
+	// Events are access by calling PollAPIManagedStream() on the returned stream.
 	// - The spec must have a name, but no UUID or type.
 	// - The name must be unique to managed API streams (separate namespace to persisted ones)
 	// - Multiple calls with the same ID will return the same object.
