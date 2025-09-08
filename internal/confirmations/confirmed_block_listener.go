@@ -64,7 +64,7 @@ type confirmedBlockListener struct {
 }
 
 func (bcm *blockConfirmationManager) StartConfirmedBlockListener(ctx context.Context, id *fftypes.UUID, fromBlock string, checkpoint *ffcapi.BlockListenerCheckpoint, eventStream chan<- *ffcapi.ListenerEvent) error {
-	_, err := bcm.startConfirmedBlockListener(ctx, id, fromBlock, checkpoint, eventStream, nil)
+	_, err := bcm.startConfirmedBlockListener(ctx, id, fromBlock, checkpoint, eventStream)
 	return err
 }
 
