@@ -267,7 +267,7 @@ func (sth *simpleTransactionHandler) prepareTransaction(ctx context.Context, txR
 		log.L(ctx).Errorf("prepareTransaction transaction prepare failed: %+v", err)
 		return nil, ffcapi.MapSubmissionRejected(reason), err
 	}
-	log.L(ctx).Debugf("prepareTransaction prepared transaction with ID %s", txID)
+	log.L(ctx).Tracef("prepareTransaction prepared transaction with ID %s", txID)
 
 	// Create the ManagedTX object without persisting it yet
 	mtx := sth.createManagedTxObject(txID, &txReq.TransactionHeaders, prepared.Gas, prepared.TransactionData)
@@ -293,7 +293,7 @@ func (sth *simpleTransactionHandler) prepareContractDeployment(ctx context.Conte
 		log.L(ctx).Errorf("prepareContractDeployment deploy contract prepare failed: %+v", err)
 		return nil, ffcapi.MapSubmissionRejected(reason), err
 	}
-	log.L(ctx).Debugf("prepareContractDeployment prepared contract deployment with ID %s", txID)
+	log.L(ctx).Tracef("prepareContractDeployment prepared contract deployment with ID %s", txID)
 
 	// Create the ManagedTX object without persisting it yet
 	mtx := sth.createManagedTxObject(txID, &txReq.TransactionHeaders, prepared.Gas, prepared.TransactionData)

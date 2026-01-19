@@ -144,7 +144,7 @@ func (sth *simpleTransactionHandler) handleBatch(
 	// Batch insert all prepared transactions using InsertTransactionsWithNextNonce
 	// This optimizes nonce allocation for transactions from the same signer and batches database operations
 	if len(preparedTxs) > 0 {
-		log.L(ctx).Debugf("HandleSubmissions batch inserting %d prepared submissions", len(preparedTxs))
+		log.L(ctx).Tracef("HandleSubmissions batch inserting %d prepared submissions", len(preparedTxs))
 		insertErrs := sth.toolkit.TXPersistence.InsertTransactionsWithNextNonce(ctx, preparedTxs, func(ctx context.Context, signer string) (uint64, error) {
 			nextNonceRes, _, err := sth.toolkit.Connector.NextNonceForSigner(ctx, &ffcapi.NextNonceForSignerRequest{
 				Signer: signer,
