@@ -57,7 +57,7 @@ var (
 	APIEndpointPostEventStreamListenerReset = ffm("api.endpoints.post.eventstream.listener.reset", "Reset an event stream listener, to redeliver all events since the specified block")
 	APIEndpointPostEventStreamResume        = ffm("api.endpoints.post.eventstream.resume", "Resume an event stream")
 	APIEndpointPostEventStreamSuspend       = ffm("api.endpoints.post.eventstream.suspend", "Suspend an event stream")
-	APIEndpointPostSubmit                   = ffm("api.endpoints.post.submit", "Submission API to submit one or multiple transaction and contract deployment requests")
+	APIEndpointPostSubmit                   = ffm("api.endpoints.post.submit", "Submission API to submit one or multiple transactions in a batch. Orders of transactions with the same 'from' address are preserved during nonce allocation.")
 	APIEndpointPostRoot                     = ffm("api.endpoints.post.root", "RPC/webhook style interface initiate a submit transactions, and execute queries")
 	APIEndpointPostRootQueryOutput          = ffm("api.endpoints.post.root.query.output", "The data result of a query against a smart contract")
 	APIEndpointPostSubscriptionReset        = ffm("api.endpoints.post.subscription.reset", "Reset listener - route deprecated in favor of /eventstreams/{streamId}/listeners/{listenerId}/reset")

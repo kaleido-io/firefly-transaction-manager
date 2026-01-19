@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2022 - 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //

@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2022 - 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -33,7 +33,7 @@ type ContractDeployRequest struct {
 	ffcapi.ContractDeployPrepareRequest
 }
 
-// BatchSubmissionRequest combines all fields from TransactionInput and ContractDeployPrepareRequest
+// SubmissionRequest combines all fields from TransactionInput and ContractDeployPrepareRequest
 // The request type is determined by which fields are present:
 // - If Definition and/or Contract are present, it's treated as a DeployContract request
 // - Otherwise, it's treated as a SendTransaction request
