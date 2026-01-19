@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2022 - 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -841,7 +841,14 @@ func TestSendTXPersistFail(t *testing.T) {
 	err = json.Unmarshal([]byte(sampleSendTX), &txReq)
 	assert.NoError(t, err)
 
-	_, err = sth.createManagedTx(sth.ctx, "id1", &txReq.TransactionHeaders, fftypes.NewFFBigInt(12345), "0x123456")
+	_, err = sth.createManagedTx(sth.ctx, &apitypes.ManagedTX{
+		ID: "id12345",
+		TransactionHeaders: ffcapi.TransactionHeaders{
+			From: "0x6b7cfa4cf9709d3b3f5f7c22de123d2e16aee712",
+			Gas:  fftypes.NewFFBigInt(12345),
+		},
+		TransactionData: "0x123456",
+	})
 	assert.Regexp(t, "pop", err)
 
 }
@@ -877,7 +884,14 @@ func TestSendGetNextNonceFail(t *testing.T) {
 	err = json.Unmarshal([]byte(sampleSendTX), &txReq)
 	assert.NoError(t, err)
 
-	_, err = sth.createManagedTx(sth.ctx, "id1", &txReq.TransactionHeaders, fftypes.NewFFBigInt(12345), "0x123456")
+	_, err = sth.createManagedTx(sth.ctx, &apitypes.ManagedTX{
+		ID: "id12345",
+		TransactionHeaders: ffcapi.TransactionHeaders{
+			From: "0x6b7cfa4cf9709d3b3f5f7c22de123d2e16aee712",
+			Gas:  fftypes.NewFFBigInt(12345),
+		},
+		TransactionData: "0x123456",
+	})
 	assert.Regexp(t, "pop", err)
 
 }
@@ -963,4 +977,233 @@ func TestIdempotencyIDPreCheckDuplicateDeploy(t *testing.T) {
 		},
 	})
 	assert.Regexp(t, "FF21065", err)
+}
+
+func TestHandleNewTransactionsBatch(t *testing.T) {
+	f, tk, mockFFCAPI, conf := newTestTransactionHandlerFactory(t)
+	conf.Set(FixedGasPrice, `12345`)
+
+	th, err := f.NewTransactionHandler(context.Background(), conf)
+	assert.NoError(t, err)
+
+	sth := th.(*simpleTransactionHandler)
+	sth.ctx = context.Background()
+
+	mp := tk.TXPersistence.(*persistencemocks.Persistence)
+	mp.On("ListTransactionsByNonce", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return([]*apitypes.ManagedTX{}, nil).Maybe()
+
+	mp.On("GetTransactionByID", sth.ctx, mock.Anything).Return(nil, nil)
+
+	mp.On("InsertTransactionsWithNextNonce", sth.ctx, mock.Anything, mock.Anything).
+		Return([]error{nil, nil, nil}) // All succeed
+
+	mockFFCAPI.On("TransactionPrepare", mock.Anything, mock.Anything).
+		Return(&ffcapi.TransactionPrepareResponse{
+			Gas:             fftypes.NewFFBigInt(100000),
+			TransactionData: "0x123456",
+		}, ffcapi.ErrorReason(""), nil).Times(3)
+
+	mockFFCAPI.On("NextNonceForSigner", mock.Anything, mock.Anything).
+		Return(&ffcapi.NextNonceForSignerResponse{
+			Nonce: fftypes.NewFFBigInt(1000),
+		}, ffcapi.ErrorReason(""), nil)
+
+	mp.On("AddSubStatusAction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Maybe()
+
+	sth.Init(sth.ctx, tk)
+
+	txReqs := []*apitypes.SubmissionRequest{
+		{
+			ID: "tx1",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
+			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value1"`)},
+		},
+		{
+			ID: "tx2",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
+			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value2"`)},
+		},
+		{
+			ID: "tx3",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
+			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value3"`)},
+		},
+	}
+
+	responses := sth.HandleSubmissions(sth.ctx, txReqs)
+	assert.Len(t, responses, 3)
+	for i := 0; i < 3; i++ {
+		assert.True(t, responses[i].Success, "Transaction %d should succeed", i)
+		assert.Nil(t, responses[i].Error, "Transaction %d should have no error", i)
+		assert.NotNil(t, responses[i].Output, "Transaction %d should have output", i)
+		assert.Equal(t, fmt.Sprintf("tx%d", i+1), responses[i].ID)
+	}
+}
+
+func TestHandleNewTransactionsBatchPartialFailure(t *testing.T) {
+	f, tk, mockFFCAPI, conf := newTestTransactionHandlerFactory(t)
+	conf.Set(FixedGasPrice, `12345`)
+
+	th, err := f.NewTransactionHandler(context.Background(), conf)
+	assert.NoError(t, err)
+
+	sth := th.(*simpleTransactionHandler)
+	sth.ctx = context.Background()
+
+	mp := tk.TXPersistence.(*persistencemocks.Persistence)
+	mp.On("ListTransactionsByNonce", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return([]*apitypes.ManagedTX{}, nil).Maybe()
+
+	mp.On("GetTransactionByID", sth.ctx, "tx1").Return(nil, nil)
+	mp.On("GetTransactionByID", sth.ctx, "tx2").Return(nil, nil)
+	mp.On("GetTransactionByID", sth.ctx, "tx3").Return(nil, nil)
+
+	mp.On("InsertTransactionsWithNextNonce", sth.ctx, mock.Anything, mock.Anything).
+		Return([]error{nil, fmt.Errorf("persistence error"), nil}) // Second one fails
+
+	mockFFCAPI.On("TransactionPrepare", mock.Anything, mock.Anything).
+		Return(&ffcapi.TransactionPrepareResponse{
+			Gas:             fftypes.NewFFBigInt(100000),
+			TransactionData: "0x123456",
+		}, ffcapi.ErrorReason(""), nil).Times(3)
+
+	mockFFCAPI.On("NextNonceForSigner", mock.Anything, mock.Anything).
+		Return(&ffcapi.NextNonceForSignerResponse{
+			Nonce: fftypes.NewFFBigInt(1000),
+		}, ffcapi.ErrorReason(""), nil)
+
+	mp.On("AddSubStatusAction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Maybe()
+
+	sth.Init(sth.ctx, tk)
+
+	txReqs := []*apitypes.SubmissionRequest{
+		{
+			ID: "tx1",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
+			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value1"`)},
+		},
+		{
+			ID: "tx2",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
+			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value2"`)},
+		},
+		{
+			ID: "tx3",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
+			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value3"`)},
+		},
+	}
+
+	responses := sth.HandleSubmissions(sth.ctx, txReqs)
+	assert.Len(t, responses, 3)
+
+	// First should succeed
+	assert.True(t, responses[0].Success, "Transaction 1 should succeed")
+	assert.Nil(t, responses[0].Error, "Transaction 1 should have no error")
+	assert.NotNil(t, responses[0].Output, "Transaction 1 should have output")
+	assert.Equal(t, "tx1", responses[0].ID)
+
+	// Second should fail
+	assert.False(t, responses[1].Success, "Transaction 2 should fail")
+	assert.NotNil(t, responses[1].Error, "Transaction 2 should have error")
+	assert.Nil(t, responses[1].Output, "Transaction 2 should have no output")
+	assert.Equal(t, "tx2", responses[1].ID)
+
+	// Third should succeed
+	assert.True(t, responses[2].Success, "Transaction 3 should succeed")
+	assert.Nil(t, responses[2].Error, "Transaction 3 should have no error")
+	assert.NotNil(t, responses[2].Output, "Transaction 3 should have output")
+	assert.Equal(t, "tx3", responses[2].ID)
+}
+
+func TestHandleNewContractDeploymentsBatch(t *testing.T) {
+	f, tk, mockFFCAPI, conf := newTestTransactionHandlerFactory(t)
+	conf.Set(FixedGasPrice, `12345`)
+
+	th, err := f.NewTransactionHandler(context.Background(), conf)
+	assert.NoError(t, err)
+
+	sth := th.(*simpleTransactionHandler)
+	sth.ctx = context.Background()
+
+	mp := tk.TXPersistence.(*persistencemocks.Persistence)
+	mp.On("ListTransactionsByNonce", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return([]*apitypes.ManagedTX{}, nil).Maybe()
+
+	mp.On("GetTransactionByID", sth.ctx, "deploy1").Return(nil, nil)
+	mp.On("GetTransactionByID", sth.ctx, "deploy2").Return(nil, nil)
+
+	mp.On("InsertTransactionsWithNextNonce", sth.ctx, mock.Anything, mock.Anything).
+		Return([]error{nil, nil}) // All succeed
+
+	mockFFCAPI.On("DeployContractPrepare", mock.Anything, mock.Anything).
+		Return(&ffcapi.TransactionPrepareResponse{
+			Gas:             fftypes.NewFFBigInt(100000),
+			TransactionData: "0x123456",
+		}, ffcapi.ErrorReason(""), nil).Times(2)
+
+	mockFFCAPI.On("NextNonceForSigner", mock.Anything, mock.Anything).
+		Return(&ffcapi.NextNonceForSignerResponse{
+			Nonce: fftypes.NewFFBigInt(1000),
+		}, ffcapi.ErrorReason(""), nil)
+
+	mp.On("AddSubStatusAction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Maybe()
+
+	sth.Init(sth.ctx, tk)
+
+	txReqs := []*apitypes.SubmissionRequest{
+		{
+			ID: "deploy1",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+			},
+			Definition: fftypes.JSONAnyPtr(`{"abi":[]}`),
+			Contract:   fftypes.JSONAnyPtr(`"0xbytecode1"`),
+		},
+		{
+			ID: "deploy2",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+			},
+			Definition: fftypes.JSONAnyPtr(`{"abi":[]}`),
+			Contract:   fftypes.JSONAnyPtr(`"0xbytecode2"`),
+		},
+	}
+
+	responses := sth.HandleSubmissions(sth.ctx, txReqs)
+	assert.Len(t, responses, 2)
+	for i := 0; i < 2; i++ {
+		assert.True(t, responses[i].Success, "Deployment %d should succeed", i)
+		assert.Nil(t, responses[i].Error, "Deployment %d should have no error", i)
+		assert.NotNil(t, responses[i].Output, "Deployment %d should have output", i)
+		assert.Equal(t, fmt.Sprintf("deploy%d", i+1), responses[i].ID)
+	}
 }

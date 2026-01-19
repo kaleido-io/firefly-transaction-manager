@@ -1,4 +1,4 @@
-// Copyright © 2024 - 2025 Kaleido, Inc.
+// Copyright © 2024 - 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -45,6 +45,7 @@ type TransactionPersistence interface {
 	GetTransactionByNonce(ctx context.Context, signer string, nonce *fftypes.FFBigInt) (*apitypes.ManagedTX, error)
 	InsertTransactionPreAssignedNonce(ctx context.Context, tx *apitypes.ManagedTX) error
 	InsertTransactionWithNextNonce(ctx context.Context, tx *apitypes.ManagedTX, lookupNextNonce NextNonceCallback) error
+	InsertTransactionsWithNextNonce(ctx context.Context, txs []*apitypes.ManagedTX, lookupNextNonce NextNonceCallback) []error
 	UpdateTransaction(ctx context.Context, txID string, updates *apitypes.TXUpdates) error
 	DeleteTransaction(ctx context.Context, txID string) error
 
@@ -173,6 +174,9 @@ type TransactionHandler interface {
 	HandleResumeTransaction(ctx context.Context, txID string) (mtx *apitypes.ManagedTX, err error)
 	// HandleTransactionUpdate - handles event of updating a managed transaction
 	HandleTransactionUpdate(ctx context.Context, txID string, update apitypes.TXUpdatesExternal) (mtx *apitypes.ManagedTX, err error)
+
+	// HandleSubmissions - handles batch of new submissions onto blockchain
+	HandleSubmissions(ctx context.Context, submissions []*apitypes.SubmissionRequest) (responses []*apitypes.SubmissionResponse)
 
 	// Informational events:
 	// HandleTransactionConfirmations - handles confirmations of blockchain transactions for a managed transaction

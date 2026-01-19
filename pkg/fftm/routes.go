@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2025 - 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -46,6 +46,7 @@ func (m *manager) routes() []*ffapi.Route {
 		postEventStreamListeners(m),
 		postEventStreamResume(m),
 		postEventStreamSuspend(m),
+		postSubmit(m),
 		postRootCommand(m),
 		postSubscriptionReset(m),
 		postSubscriptions(m),
