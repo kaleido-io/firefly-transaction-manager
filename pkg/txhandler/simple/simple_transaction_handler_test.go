@@ -1014,65 +1014,43 @@ func TestHandleNewTransactionsBatch(t *testing.T) {
 
 	sth.Init(sth.ctx, tk)
 
-	txReqs := []*apitypes.TransactionRequest{
+	txReqs := []*apitypes.SubmissionRequest{
 		{
-			Headers: apitypes.RequestHeaders{
-				Type: apitypes.RequestTypeSendTransaction,
+			ID: "tx1",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
 			},
-			TransactionInput: ffcapi.TransactionInput{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-					To:   "0x222222",
-				},
-				Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
-				Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value1"`)},
-			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value1"`)},
 		},
 		{
-			Headers: apitypes.RequestHeaders{
-				ID:   "tx2",
-				Type: apitypes.RequestTypeSendTransaction,
+			ID: "tx2",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
 			},
-			TransactionInput: ffcapi.TransactionInput{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-					To:   "0x222222",
-				},
-				Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
-				Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value2"`)},
-			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value2"`)},
 		},
 		{
-			Headers: apitypes.RequestHeaders{
-				ID:   "tx3",
-				Type: apitypes.RequestTypeSendTransaction,
+			ID: "tx3",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
 			},
-			TransactionInput: ffcapi.TransactionInput{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-					To:   "0x222222",
-				},
-				Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
-				Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value3"`)},
-			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value3"`)},
 		},
 	}
 
-	mtxs, submissionRejected, errs := sth.HandleNewTransactions(sth.ctx, txReqs)
-	assert.Len(t, mtxs, 3)
-	assert.Len(t, submissionRejected, 3)
-	assert.Len(t, errs, 3)
-
+	responses := sth.HandleSubmissions(sth.ctx, txReqs)
+	assert.Len(t, responses, 3)
 	for i := 0; i < 3; i++ {
-		assert.NotNil(t, mtxs[i], "Transaction %d should succeed", i)
-		assert.False(t, submissionRejected[i], "Transaction %d should not be rejected", i)
-		assert.NoError(t, errs[i], "Transaction %d should have no error", i)
-		if i == 0 {
-			assert.NotEmpty(t, mtxs[i].ID)
-		} else {
-			assert.Equal(t, fmt.Sprintf("tx%d", i+1), mtxs[i].ID)
-
-		}
+		assert.True(t, responses[i].Success, "Transaction %d should succeed", i)
+		assert.Nil(t, responses[i].Error, "Transaction %d should have no error", i)
+		assert.NotNil(t, responses[i].Output, "Transaction %d should have output", i)
+		assert.Equal(t, fmt.Sprintf("tx%d", i+1), responses[i].ID)
 	}
 }
 
@@ -1113,71 +1091,56 @@ func TestHandleNewTransactionsBatchPartialFailure(t *testing.T) {
 
 	sth.Init(sth.ctx, tk)
 
-	txReqs := []*apitypes.TransactionRequest{
+	txReqs := []*apitypes.SubmissionRequest{
 		{
-			Headers: apitypes.RequestHeaders{
-				ID:   "tx1",
-				Type: apitypes.RequestTypeSendTransaction,
+			ID: "tx1",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
 			},
-			TransactionInput: ffcapi.TransactionInput{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-					To:   "0x222222",
-				},
-				Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
-				Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value1"`)},
-			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value1"`)},
 		},
 		{
-			Headers: apitypes.RequestHeaders{
-				ID:   "tx2",
-				Type: apitypes.RequestTypeSendTransaction,
+			ID: "tx2",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
 			},
-			TransactionInput: ffcapi.TransactionInput{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-					To:   "0x222222",
-				},
-				Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
-				Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value2"`)},
-			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value2"`)},
 		},
 		{
-			Headers: apitypes.RequestHeaders{
-				ID:   "tx3",
-				Type: apitypes.RequestTypeSendTransaction,
+			ID: "tx3",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
+				To:   "0x222222",
 			},
-			TransactionInput: ffcapi.TransactionInput{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-					To:   "0x222222",
-				},
-				Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
-				Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value3"`)},
-			},
+			Method: fftypes.JSONAnyPtr(`{"type":"function","name":"test"}`),
+			Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"value3"`)},
 		},
 	}
 
-	mtxs, submissionRejected, errs := sth.HandleNewTransactions(sth.ctx, txReqs)
-	assert.Len(t, mtxs, 3)
-	assert.Len(t, submissionRejected, 3)
-	assert.Len(t, errs, 3)
+	responses := sth.HandleSubmissions(sth.ctx, txReqs)
+	assert.Len(t, responses, 3)
 
 	// First should succeed
-	assert.NotNil(t, mtxs[0])
-	assert.False(t, submissionRejected[0])
-	assert.NoError(t, errs[0])
+	assert.True(t, responses[0].Success, "Transaction 1 should succeed")
+	assert.Nil(t, responses[0].Error, "Transaction 1 should have no error")
+	assert.NotNil(t, responses[0].Output, "Transaction 1 should have output")
+	assert.Equal(t, "tx1", responses[0].ID)
 
-	// Second should fail due to persistence error
-	assert.Nil(t, mtxs[1])
-	assert.False(t, submissionRejected[1])
-	assert.Error(t, errs[1])
-	assert.Contains(t, errs[1].Error(), "persistence error")
+	// Second should fail
+	assert.False(t, responses[1].Success, "Transaction 2 should fail")
+	assert.NotNil(t, responses[1].Error, "Transaction 2 should have error")
+	assert.Nil(t, responses[1].Output, "Transaction 2 should have no output")
+	assert.Equal(t, "tx2", responses[1].ID)
 
 	// Third should succeed
-	assert.NotNil(t, mtxs[2])
-	assert.False(t, submissionRejected[2])
-	assert.NoError(t, errs[2])
+	assert.True(t, responses[2].Success, "Transaction 3 should succeed")
+	assert.Nil(t, responses[2].Error, "Transaction 3 should have no error")
+	assert.NotNil(t, responses[2].Output, "Transaction 3 should have output")
+	assert.Equal(t, "tx3", responses[2].ID)
 }
 
 func TestHandleNewContractDeploymentsBatch(t *testing.T) {
@@ -1216,44 +1179,31 @@ func TestHandleNewContractDeploymentsBatch(t *testing.T) {
 
 	sth.Init(sth.ctx, tk)
 
-	txReqs := []*apitypes.ContractDeployRequest{
+	txReqs := []*apitypes.SubmissionRequest{
 		{
-			Headers: apitypes.RequestHeaders{
-				ID:   "deploy1",
-				Type: apitypes.RequestTypeDeploy,
+			ID: "deploy1",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
 			},
-			ContractDeployPrepareRequest: ffcapi.ContractDeployPrepareRequest{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-				},
-				Definition: fftypes.JSONAnyPtr(`{"abi":[]}`),
-				Contract:   fftypes.JSONAnyPtr(`"0xbytecode1"`),
-			},
+			Definition: fftypes.JSONAnyPtr(`{"abi":[]}`),
+			Contract:   fftypes.JSONAnyPtr(`"0xbytecode1"`),
 		},
 		{
-			Headers: apitypes.RequestHeaders{
-				ID:   "deploy2",
-				Type: apitypes.RequestTypeDeploy,
+			ID: "deploy2",
+			TransactionHeaders: ffcapi.TransactionHeaders{
+				From: "0x111111",
 			},
-			ContractDeployPrepareRequest: ffcapi.ContractDeployPrepareRequest{
-				TransactionHeaders: ffcapi.TransactionHeaders{
-					From: "0x111111",
-				},
-				Definition: fftypes.JSONAnyPtr(`{"abi":[]}`),
-				Contract:   fftypes.JSONAnyPtr(`"0xbytecode2"`),
-			},
+			Definition: fftypes.JSONAnyPtr(`{"abi":[]}`),
+			Contract:   fftypes.JSONAnyPtr(`"0xbytecode2"`),
 		},
 	}
 
-	mtxs, submissionRejected, errs := sth.HandleNewContractDeployments(sth.ctx, txReqs)
-	assert.Len(t, mtxs, 2)
-	assert.Len(t, submissionRejected, 2)
-	assert.Len(t, errs, 2)
-
+	responses := sth.HandleSubmissions(sth.ctx, txReqs)
+	assert.Len(t, responses, 2)
 	for i := 0; i < 2; i++ {
-		assert.NotNil(t, mtxs[i], "Deployment %d should succeed", i)
-		assert.False(t, submissionRejected[i], "Deployment %d should not be rejected", i)
-		assert.NoError(t, errs[i], "Deployment %d should have no error", i)
-		assert.Equal(t, fmt.Sprintf("deploy%d", i+1), mtxs[i].ID)
+		assert.True(t, responses[i].Success, "Deployment %d should succeed", i)
+		assert.Nil(t, responses[i].Error, "Deployment %d should have no error", i)
+		assert.NotNil(t, responses[i].Output, "Deployment %d should have output", i)
+		assert.Equal(t, fmt.Sprintf("deploy%d", i+1), responses[i].ID)
 	}
 }

@@ -16,20 +16,12 @@
 
 package apitypes
 
-// BatchRequest contains an array of requests to be processed in batch
+// BatchRequest contains an array of batch submission requests to be processed
 type BatchRequest struct {
-	Requests []*BaseRequest `json:"requests"`
-}
-
-// BatchResponseItem represents a single response in a batch operation
-type BatchResponseItem struct {
-	ID      string      `json:"id,omitempty"`     // ID from the request headers, if present
-	Success bool        `json:"success"`          // Whether this request succeeded
-	Output  interface{} `json:"output,omitempty"` // The successful response (ManagedTX for SendTransaction/Deploy)
-	Error   interface{} `json:"error,omitempty"`  // Error (SubmissionError for SendTransaction/Deploy, string for others) if success is false
+	Requests []*SubmissionRequest `json:"requests"`
 }
 
 // BatchResponse contains the results of a batch operation
 type BatchResponse struct {
-	Responses []*BatchResponseItem `json:"responses"`
+	Responses []*SubmissionResponse `json:"responses"`
 }

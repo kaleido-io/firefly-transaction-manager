@@ -17,6 +17,7 @@
 package apitypes
 
 import (
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
@@ -30,4 +31,31 @@ type TransactionRequest struct {
 type ContractDeployRequest struct {
 	Headers RequestHeaders `json:"headers"`
 	ffcapi.ContractDeployPrepareRequest
+}
+
+// BatchSubmissionRequest combines all fields from TransactionInput and ContractDeployPrepareRequest
+// The request type is determined by which fields are present:
+// - If Definition and/or Contract are present, it's treated as a DeployContract request
+// - Otherwise, it's treated as a SendTransaction request
+type SubmissionRequest struct {
+	// Common fields for all requests
+	ID string `ffstruct:"fftmrequest" json:"id"`
+	ffcapi.TransactionHeaders
+	Params []*fftypes.JSONAny `json:"params,omitempty"`
+	Errors []*fftypes.JSONAny `json:"errors,omitempty"`
+
+	// TransactionInput fields
+	Method *fftypes.JSONAny `json:"method,omitempty"`
+
+	// ContractDeployPrepareRequest fields
+	Definition *fftypes.JSONAny `json:"definition,omitempty"` // such as an ABI for EVM
+	Contract   *fftypes.JSONAny `json:"contract,omitempty"`   // such as the Bytecode for EVM
+}
+
+// SubmissionResponse is the response to a single submission request
+type SubmissionResponse struct {
+	ID      string      `json:"id,omitempty"`     // ID from the request headers, if present
+	Success bool        `json:"success"`          // Whether this request succeeded
+	Output  interface{} `json:"output,omitempty"` // The successful response (ManagedTX for SendTransaction/Deploy)
+	Error   interface{} `json:"error,omitempty"`  // Error (SubmissionError for SendTransaction/Deploy, string for others) if success is false
 }

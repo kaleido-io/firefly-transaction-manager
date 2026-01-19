@@ -86,47 +86,6 @@ func (_m *TransactionHandler) HandleNewContractDeployment(ctx context.Context, t
 	return r0, r1, r2
 }
 
-// HandleNewContractDeployments provides a mock function with given fields: ctx, txReqs
-func (_m *TransactionHandler) HandleNewContractDeployments(ctx context.Context, txReqs []*apitypes.ContractDeployRequest) ([]*apitypes.ManagedTX, []bool, []error) {
-	ret := _m.Called(ctx, txReqs)
-
-	if len(ret) == 0 {
-		panic("no return value specified for HandleNewContractDeployments")
-	}
-
-	var r0 []*apitypes.ManagedTX
-	var r1 []bool
-	var r2 []error
-	if rf, ok := ret.Get(0).(func(context.Context, []*apitypes.ContractDeployRequest) ([]*apitypes.ManagedTX, []bool, []error)); ok {
-		return rf(ctx, txReqs)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, []*apitypes.ContractDeployRequest) []*apitypes.ManagedTX); ok {
-		r0 = rf(ctx, txReqs)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*apitypes.ManagedTX)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, []*apitypes.ContractDeployRequest) []bool); ok {
-		r1 = rf(ctx, txReqs)
-	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]bool)
-		}
-	}
-
-	if rf, ok := ret.Get(2).(func(context.Context, []*apitypes.ContractDeployRequest) []error); ok {
-		r2 = rf(ctx, txReqs)
-	} else {
-		if ret.Get(2) != nil {
-			r2 = ret.Get(2).([]error)
-		}
-	}
-
-	return r0, r1, r2
-}
-
 // HandleNewTransaction provides a mock function with given fields: ctx, txReq
 func (_m *TransactionHandler) HandleNewTransaction(ctx context.Context, txReq *apitypes.TransactionRequest) (*apitypes.ManagedTX, bool, error) {
 	ret := _m.Called(ctx, txReq)
@@ -164,47 +123,6 @@ func (_m *TransactionHandler) HandleNewTransaction(ctx context.Context, txReq *a
 	return r0, r1, r2
 }
 
-// HandleNewTransactions provides a mock function with given fields: ctx, txReqs
-func (_m *TransactionHandler) HandleNewTransactions(ctx context.Context, txReqs []*apitypes.TransactionRequest) ([]*apitypes.ManagedTX, []bool, []error) {
-	ret := _m.Called(ctx, txReqs)
-
-	if len(ret) == 0 {
-		panic("no return value specified for HandleNewTransactions")
-	}
-
-	var r0 []*apitypes.ManagedTX
-	var r1 []bool
-	var r2 []error
-	if rf, ok := ret.Get(0).(func(context.Context, []*apitypes.TransactionRequest) ([]*apitypes.ManagedTX, []bool, []error)); ok {
-		return rf(ctx, txReqs)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, []*apitypes.TransactionRequest) []*apitypes.ManagedTX); ok {
-		r0 = rf(ctx, txReqs)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*apitypes.ManagedTX)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, []*apitypes.TransactionRequest) []bool); ok {
-		r1 = rf(ctx, txReqs)
-	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]bool)
-		}
-	}
-
-	if rf, ok := ret.Get(2).(func(context.Context, []*apitypes.TransactionRequest) []error); ok {
-		r2 = rf(ctx, txReqs)
-	} else {
-		if ret.Get(2) != nil {
-			r2 = ret.Get(2).([]error)
-		}
-	}
-
-	return r0, r1, r2
-}
-
 // HandleResumeTransaction provides a mock function with given fields: ctx, txID
 func (_m *TransactionHandler) HandleResumeTransaction(ctx context.Context, txID string) (*apitypes.ManagedTX, error) {
 	ret := _m.Called(ctx, txID)
@@ -233,6 +151,26 @@ func (_m *TransactionHandler) HandleResumeTransaction(ctx context.Context, txID 
 	}
 
 	return r0, r1
+}
+
+// HandleSubmissions provides a mock function with given fields: ctx, submissions
+func (_m *TransactionHandler) HandleSubmissions(ctx context.Context, submissions []*apitypes.SubmissionRequest) []*apitypes.SubmissionResponse {
+	ret := _m.Called(ctx, submissions)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HandleSubmissions")
+	}
+
+	var r0 []*apitypes.SubmissionResponse
+	if rf, ok := ret.Get(0).(func(context.Context, []*apitypes.SubmissionRequest) []*apitypes.SubmissionResponse); ok {
+		r0 = rf(ctx, submissions)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*apitypes.SubmissionResponse)
+		}
+	}
+
+	return r0
 }
 
 // HandleSuspendTransaction provides a mock function with given fields: ctx, txID
