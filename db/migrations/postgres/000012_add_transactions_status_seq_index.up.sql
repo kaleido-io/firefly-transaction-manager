@@ -1,3 +1,3 @@
 BEGIN;
-CREATE INDEX transactions_status_seq ON transactions(status, seq);
+CREATE INDEX IF EXISTS transactions_status_seq ON transactions(status, seq);
 COMMIT;
