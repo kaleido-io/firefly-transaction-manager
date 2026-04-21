@@ -61,6 +61,9 @@ type API interface {
 	// DeployContractPrepare
 	DeployContractPrepare(ctx context.Context, req *ContractDeployPrepareRequest) (*TransactionPrepareResponse, ErrorReason, error)
 
+	// GetBlockListenerTrackingMode gets the tracking mode of the block listener
+	GetBlockListenerTrackingMode(ctx context.Context) BlockListenerTrackingMode
+
 	// EventStreamStart starts an event stream with an initial set of listeners (which might be empty), a channel to deliver events, and a context that will close to stop the stream
 	EventStreamStart(ctx context.Context, req *EventStreamStartRequest) (*EventStreamStartResponse, ErrorReason, error)
 
@@ -95,6 +98,15 @@ type API interface {
 	IsReady(ctx context.Context) (*ReadyResponse, ErrorReason, error)
 }
 
+type BlockListenerTrackingMode string
+
+const (
+	// BlockListenerTrackingModeHeadBlockNumber in this mode, the block listener tracks the head block number of the blockchain only without fetching any block details
+	BlockListenerTrackingModeHeadBlockNumber BlockListenerTrackingMode = "headBlockNumber"
+	// BlockListenerTrackingModeInMemoryPartialChain in this mode, the block listener tracks the in-memory partial chain of blocks, fetching block details as needed
+	BlockListenerTrackingModeInMemoryPartialChain BlockListenerTrackingMode = "inMemoryPartialChain"
+)
+
 type ConfirmationUpdateResult struct {
 	// a linked list of accumulated confirmations for a transaction
 	// the list is sorted by block number
@@ -104,7 +116,9 @@ type ConfirmationUpdateResult struct {
 	// in the in-memory partial chain
 	// WARNING: mutation to this list is not expected, invalid modifications will cause inefficiencies in the reconciliation process
 	//          `rebuilt` will be true if an invalid confirmation list is detected by the reconciliation process
-	Confirmations           []*MinimalBlockInfo         `json:"confirmations,omitempty"`
+	Confirmations           []*MinimalBlockInfo `json:"confirmations,omitempty"` // the current list of confirmations for this reconcile request, only returned when confirmation mode is set to validatedBlocks
+	ActualConfirmationCount uint64              `json:"actualConfirmationCount"` // the current number of confirmations for this reconcile request
+
 	Receipt                 *TransactionReceiptResponse `json:"receipt,omitempty"`       // receipt for the transaction
 	Rebuilt                 bool                        `json:"rebuilt,omitempty"`       // when true, it means the existing confirmations contained invalid blocks, the new confirmations are rebuilt from scratch
 	NewFork                 bool                        `json:"newFork,omitempty"`       // when true, it means a new fork was detected based on the existing confirmations
@@ -126,9 +140,10 @@ func (c *MinimalBlockInfo) IsParentOf(other *MinimalBlockInfo) bool {
 }
 
 type BlockHashEvent struct {
-	BlockHashes  []string        `json:"blockHash"`              // zero or more hashes (can be nil)
-	GapPotential bool            `json:"gapPotential,omitempty"` // when true, the caller cannot be sure if blocks have been missed (use on reconnect of a websocket for example)
-	Created      *fftypes.FFTime `json:"created,omitempty"`      // timestamp when the blockhash event is created
+	BlockHashes     []string        `json:"blockHash"`              // zero or more hashes (can be nil)
+	GapPotential    bool            `json:"gapPotential,omitempty"` // when true, the caller cannot be sure if blocks have been missed (use on reconnect of a websocket for example)
+	Created         *fftypes.FFTime `json:"created,omitempty"`      // timestamp when the blockhash event is created
+	HeadBlockNumber uint64          `json:"headBlockNumber"`        // the highest block seen by the connector
 }
 
 // EventID are the set of required fields an FFCAPI compatible connector needs to map to the underlying blockchain constructs, to uniquely identify an event
