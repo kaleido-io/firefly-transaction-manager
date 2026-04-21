@@ -94,6 +94,9 @@ type Metrics interface {
 
 	GetAPIServerRESTHTTPMiddleware() func(next http.Handler) http.Handler
 
+	// MetricsRegistry returns the metrics registry for this metrics manager
+	MetricsRegistry() metric.MetricsRegistry
+
 	// functions for transaction handler to define and emit metrics
 	// Transaction handler metrics are defined and emitted by transaction handlers
 	TransactionHandlerMetrics
@@ -105,6 +108,10 @@ type Metrics interface {
 // Transaction handler metrics are defined and emitted by transaction handlers
 type TransactionHandlerMetrics interface {
 	txhandler.TransactionMetrics
+}
+
+func (mm *metricsManager) MetricsRegistry() metric.MetricsRegistry {
+	return mm.metricsRegistry
 }
 
 func (mm *metricsManager) InitTxHandlerCounterMetric(ctx context.Context, metricName string, helpText string, withDefaultLabels bool) {

@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/httpserver"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-common/pkg/metric"
 	"github.com/hyperledger/firefly-transaction-manager/internal/blocklistener"
 	"github.com/hyperledger/firefly-transaction-manager/internal/confirmations"
 	"github.com/hyperledger/firefly-transaction-manager/internal/events"
@@ -79,6 +80,9 @@ type Manager interface {
 
 	// Ability to submit new transactions into the transaction handler for management/submission
 	TransactionHandler() txhandler.TransactionHandler
+
+	// MetricsRegistry returns the metrics registry for this manager for customizing metrics
+	MetricsRegistry() metric.MetricsRegistry
 }
 
 type manager struct {
@@ -244,6 +248,10 @@ func (m *manager) TransactionHandler() txhandler.TransactionHandler {
 
 func (m *manager) TransactionCompletions() txhandler.TransactionCompletions {
 	return m.persistence.TransactionCompletions()
+}
+
+func (m *manager) MetricsRegistry() metric.MetricsRegistry {
+	return m.metricsManager.MetricsRegistry()
 }
 
 func (m *manager) APIRouter() *mux.Router {
