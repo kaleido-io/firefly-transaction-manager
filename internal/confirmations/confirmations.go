@@ -682,14 +682,21 @@ func (bcm *blockConfirmationManager) dispatchConfirmations(item *pendingItem) {
 		}
 	}
 
+	confirmationCount := uint64(len(item.confirmations))
+	if confirmationCount > bcm.requiredConfirmations {
+		confirmationCount = bcm.requiredConfirmations
+	}
+
 	// Possible for us to re-dispatch the same confirmations, if we are notified about a block later after
 	// after we previously did a crawl for blocks.
 	// So we protect here against dispatching an empty array
 	if len(notificationConfirmations) > 0 || item.confirmed {
 		notification := &apitypes.ConfirmationsNotification{
-			Confirmed:     item.confirmed,
-			NewFork:       newFork,
-			Confirmations: notificationConfirmations,
+			Confirmed:               item.confirmed,
+			ActualConfirmationCount: confirmationCount,
+			TargetConfirmationCount: bcm.requiredConfirmations,
+			NewFork:                 newFork,
+			Confirmations:           notificationConfirmations,
 		}
 		// Take a copy of the notification confirmations so we know what we have previously notified next time round
 		// (not safe to keep a reference, in case it's modified by the callback).

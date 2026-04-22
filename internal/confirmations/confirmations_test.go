@@ -190,6 +190,8 @@ func TestBlockConfirmationManagerE2ENewEvent(t *testing.T) {
 		apitypes.ConfirmationFromBlock(block1002),
 		apitypes.ConfirmationFromBlock(block1003),
 	}, dispatched.Confirmations)
+	assert.Equal(t, uint64(2), dispatched.ActualConfirmationCount)
+	assert.Equal(t, uint64(3), dispatched.TargetConfirmationCount)
 	assert.True(t, dispatched.NewFork)
 	assert.False(t, dispatched.Confirmed)
 
@@ -198,6 +200,8 @@ func TestBlockConfirmationManagerE2ENewEvent(t *testing.T) {
 	assert.Equal(t, []*apitypes.Confirmation{
 		apitypes.ConfirmationFromBlock(block1004),
 	}, dispatched.Confirmations)
+	assert.Equal(t, uint64(3), dispatched.ActualConfirmationCount)
+	assert.Equal(t, uint64(3), dispatched.TargetConfirmationCount)
 	assert.False(t, dispatched.NewFork)
 	assert.True(t, dispatched.Confirmed)
 
