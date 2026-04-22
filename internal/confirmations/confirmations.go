@@ -156,7 +156,7 @@ type pendingItem struct {
 	confirmations             []*apitypes.Confirmation
 	scheduledAtLeastOnce      bool
 	confirmed                 bool
-	previousConfirmationCount *uint64       // headBlockNumber mode: last dispatched ActualConfirmationCount
+	previousConfirmationCount *uint64       // headBlockNumber mode: last dispatched CurrentConfirmationCount
 	queuedStale               *list.Element // protected by receiptChecker mux
 	lastReceiptCheck          time.Time     // protected by receiptChecker mux
 	receiptCallback           func(ctx context.Context, receipt *ffcapi.TransactionReceiptResponse)
@@ -692,11 +692,11 @@ func (bcm *blockConfirmationManager) dispatchConfirmations(item *pendingItem) {
 	// So we protect here against dispatching an empty array
 	if len(notificationConfirmations) > 0 || item.confirmed {
 		notification := &apitypes.ConfirmationsNotification{
-			Confirmed:               item.confirmed,
-			ActualConfirmationCount: confirmationCount,
-			TargetConfirmationCount: bcm.requiredConfirmations,
-			NewFork:                 newFork,
-			Confirmations:           notificationConfirmations,
+			Confirmed:                item.confirmed,
+			CurrentConfirmationCount: confirmationCount,
+			TargetConfirmationCount:  bcm.requiredConfirmations,
+			NewFork:                  newFork,
+			Confirmations:            notificationConfirmations,
 		}
 		// Take a copy of the notification confirmations so we know what we have previously notified next time round
 		// (not safe to keep a reference, in case it's modified by the callback).
@@ -859,12 +859,12 @@ func (bcm *blockConfirmationManager) confirmationCheckUsingHighestBlock(pending 
 		return nil
 	}
 
-	actualConfirmationCount := uint64(0)
+	currentConfirmationCount := uint64(0)
 	if bcm.headBlockNumber > pending.blockNumber {
-		actualConfirmationCount = bcm.headBlockNumber - pending.blockNumber
+		currentConfirmationCount = bcm.headBlockNumber - pending.blockNumber
 	}
 
-	return bcm.dispatchBlockHeightConfirmations(pending, actualConfirmationCount)
+	return bcm.dispatchBlockHeightConfirmations(pending, currentConfirmationCount)
 
 }
 
@@ -909,15 +909,15 @@ func (bcm *blockConfirmationManager) dispatchBlockHeightConfirmations(pending *p
 	// when not confirmed, we assume the receipt is still valid and return the actual confirmation count
 
 	notification := &apitypes.ConfirmationsNotification{
-		Confirmed:               confirmed,
-		NewFork:                 pending.previousConfirmationCount != nil && count < *pending.previousConfirmationCount, // the only fork situation we can detect is a reduction in confirmation count
-		ActualConfirmationCount: confirmationCount,                                                                      // NOTE: we returns the actual confirmation count, which can be higher than the required confirmation count
-		TargetConfirmationCount: bcm.requiredConfirmations,
+		Confirmed:                confirmed,
+		NewFork:                  pending.previousConfirmationCount != nil && count < *pending.previousConfirmationCount, // the only fork situation we can detect is a reduction in confirmation count
+		CurrentConfirmationCount: confirmationCount,                                                                      // NOTE: we returns the actual confirmation count, which can be higher than the required confirmation count
+		TargetConfirmationCount:  bcm.requiredConfirmations,
 	}
 	pending.previousConfirmationCount = &count
 
 	log.L(bcm.ctx).Infof("Block height confirmation notification item=%s confirmed=%t count=%d/%d newFork=%t",
-		pending.getKey(), notification.Confirmed, notification.ActualConfirmationCount, notification.TargetConfirmationCount, notification.NewFork)
+		pending.getKey(), notification.Confirmed, notification.CurrentConfirmationCount, notification.TargetConfirmationCount, notification.NewFork)
 	pending.confirmationsCallback(bcm.ctx, notification)
 	bcm.metricsEmitter.RecordConfirmationMetrics(bcm.ctx, time.Since(pending.added).Seconds())
 

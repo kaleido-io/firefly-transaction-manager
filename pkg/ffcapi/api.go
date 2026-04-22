@@ -116,8 +116,8 @@ type ConfirmationUpdateResult struct {
 	// in the in-memory partial chain
 	// WARNING: mutation to this list is not expected, invalid modifications will cause inefficiencies in the reconciliation process
 	//          `rebuilt` will be true if an invalid confirmation list is detected by the reconciliation process
-	Confirmations           []*MinimalBlockInfo `json:"confirmations,omitempty"` // the current list of confirmations for this reconcile request, only returned when confirmation mode is set to validatedBlocks
-	ActualConfirmationCount uint64              `json:"actualConfirmationCount"` // the current number of confirmations for this reconcile request
+	Confirmations            []*MinimalBlockInfo `json:"confirmations,omitempty"`  // the current list of confirmations for this reconcile request, only returned when confirmation mode is set to validatedBlocks
+	CurrentConfirmationCount uint64              `json:"currentConfirmationCount"` // the current number of confirmations for this reconcile request
 
 	Receipt                 *TransactionReceiptResponse `json:"receipt,omitempty"`       // receipt for the transaction
 	Rebuilt                 bool                        `json:"rebuilt,omitempty"`       // when true, it means the existing confirmations contained invalid blocks, the new confirmations are rebuilt from scratch

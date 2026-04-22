@@ -440,8 +440,8 @@ type ConfirmationsNotification struct {
 	// Confirmations is the list of confirmations being notified - assured to be non-nil.
 	// The list will only be populated if confirmation mode is set to validatedBlocks.
 	Confirmations []*Confirmation
-	// ActualConfirmationCount is the actual number of confirmations for the transaction
-	ActualConfirmationCount uint64 `json:"actualConfirmationCount"`
+	// CurrentConfirmationCount is the actual number of confirmations for the transaction
+	CurrentConfirmationCount uint64 `json:"currentConfirmationCount"`
 
 	// TargetConfirmationCount is the target number of confirmations to confirm the transaction
 	TargetConfirmationCount uint64 `json:"targetConfirmationCount"`

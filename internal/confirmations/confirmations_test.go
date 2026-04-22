@@ -190,7 +190,7 @@ func TestBlockConfirmationManagerE2ENewEvent(t *testing.T) {
 		apitypes.ConfirmationFromBlock(block1002),
 		apitypes.ConfirmationFromBlock(block1003),
 	}, dispatched.Confirmations)
-	assert.Equal(t, uint64(2), dispatched.ActualConfirmationCount)
+	assert.Equal(t, uint64(2), dispatched.CurrentConfirmationCount)
 	assert.Equal(t, uint64(3), dispatched.TargetConfirmationCount)
 	assert.True(t, dispatched.NewFork)
 	assert.False(t, dispatched.Confirmed)
@@ -200,7 +200,7 @@ func TestBlockConfirmationManagerE2ENewEvent(t *testing.T) {
 	assert.Equal(t, []*apitypes.Confirmation{
 		apitypes.ConfirmationFromBlock(block1004),
 	}, dispatched.Confirmations)
-	assert.Equal(t, uint64(3), dispatched.ActualConfirmationCount)
+	assert.Equal(t, uint64(3), dispatched.CurrentConfirmationCount)
 	assert.Equal(t, uint64(3), dispatched.TargetConfirmationCount)
 	assert.False(t, dispatched.NewFork)
 	assert.True(t, dispatched.Confirmed)
@@ -1380,7 +1380,7 @@ func TestBlockConfirmationManagerHeadBlockNumberConfirmsEvent(t *testing.T) {
 	n0 := <-confirmed
 	assert.False(t, n0.Confirmed)
 	assert.False(t, n0.NewFork)
-	assert.Equal(t, uint64(0), n0.ActualConfirmationCount)
+	assert.Equal(t, uint64(0), n0.CurrentConfirmationCount)
 	assert.Equal(t, uint64(3), n0.TargetConfirmationCount)
 	assert.Empty(t, n0.Confirmations)
 
@@ -1389,7 +1389,7 @@ func TestBlockConfirmationManagerHeadBlockNumberConfirmsEvent(t *testing.T) {
 	n1 := <-confirmed
 	assert.True(t, n1.Confirmed)
 	assert.False(t, n1.NewFork)
-	assert.Equal(t, uint64(3), n1.ActualConfirmationCount)
+	assert.Equal(t, uint64(3), n1.CurrentConfirmationCount)
 	assert.Equal(t, uint64(3), n1.TargetConfirmationCount)
 	assert.Empty(t, n1.Confirmations)
 
@@ -1433,21 +1433,21 @@ func TestBlockConfirmationManagerHeadBlockNumberNewForkOnHeadDrop(t *testing.T) 
 	n0 := <-confirmed
 	assert.False(t, n0.Confirmed)
 	assert.False(t, n0.NewFork)
-	assert.Equal(t, uint64(0), n0.ActualConfirmationCount)
+	assert.Equal(t, uint64(0), n0.CurrentConfirmationCount)
 
 	ch <- &ffcapi.BlockHashEvent{HeadBlockNumber: 1003}
 
 	n1 := <-confirmed
 	assert.False(t, n1.Confirmed)
 	assert.False(t, n1.NewFork)
-	assert.Equal(t, uint64(2), n1.ActualConfirmationCount)
+	assert.Equal(t, uint64(2), n1.CurrentConfirmationCount)
 
 	ch <- &ffcapi.BlockHashEvent{HeadBlockNumber: 1002}
 
 	n2 := <-confirmed
 	assert.False(t, n2.Confirmed)
 	assert.True(t, n2.NewFork)
-	assert.Equal(t, uint64(1), n2.ActualConfirmationCount)
+	assert.Equal(t, uint64(1), n2.CurrentConfirmationCount)
 
 	// validate confirmation for the new head block
 	mca.On("TransactionReceipt", mock.Anything, mock.MatchedBy(func(r *ffcapi.TransactionReceiptRequest) bool {
@@ -1463,7 +1463,7 @@ func TestBlockConfirmationManagerHeadBlockNumberNewForkOnHeadDrop(t *testing.T) 
 	n3 := <-confirmed
 	assert.True(t, n3.Confirmed)
 	assert.False(t, n3.NewFork)
-	assert.Equal(t, uint64(3), n3.ActualConfirmationCount)
+	assert.Equal(t, uint64(3), n3.CurrentConfirmationCount)
 	assert.Equal(t, uint64(3), n3.TargetConfirmationCount)
 
 	bcm.Stop()
