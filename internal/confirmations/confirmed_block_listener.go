@@ -69,8 +69,8 @@ func (bcm *blockConfirmationManager) StartConfirmedBlockListener(ctx context.Con
 }
 
 func (bcm *blockConfirmationManager) startConfirmedBlockListener(fgCtx context.Context, id *fftypes.UUID, fromBlock string, checkpoint *ffcapi.BlockListenerCheckpoint, eventStream chan<- *ffcapi.ListenerEvent) (cbl *confirmedBlockListener, err error) {
-	if bcm.blockListenerTrackingMode == ffcapi.BlockListenerTrackingModeHeadBlockNumber {
-		return nil, i18n.NewError(fgCtx, tmmsgs.MsgConfirmedBlockListenerUnsupportedMode, bcm.blockListenerTrackingMode)
+	if bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight {
+		return nil, i18n.NewError(fgCtx, tmmsgs.MsgConfirmedBlockListenerUnsupportedMode, bcm.chainTrackingMode)
 	}
 	cbl = &confirmedBlockListener{
 		bcm: bcm,

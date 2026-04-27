@@ -61,8 +61,8 @@ type API interface {
 	// DeployContractPrepare
 	DeployContractPrepare(ctx context.Context, req *ContractDeployPrepareRequest) (*TransactionPrepareResponse, ErrorReason, error)
 
-	// GetBlockListenerTrackingMode gets the tracking mode of the block listener
-	GetBlockListenerTrackingMode(ctx context.Context) BlockListenerTrackingMode
+	// GetChainTrackingMode gets the tracking mode of the chain progress, which determines the level of detail of the confirmation result and the support of block listener
+	GetChainTrackingMode(ctx context.Context) ChainTrackingMode
 
 	// EventStreamStart starts an event stream with an initial set of listeners (which might be empty), a channel to deliver events, and a context that will close to stop the stream
 	EventStreamStart(ctx context.Context, req *EventStreamStartRequest) (*EventStreamStartResponse, ErrorReason, error)
@@ -98,13 +98,13 @@ type API interface {
 	IsReady(ctx context.Context) (*ReadyResponse, ErrorReason, error)
 }
 
-type BlockListenerTrackingMode string
+type ChainTrackingMode string
 
 const (
-	// BlockListenerTrackingModeHeadBlockNumber in this mode, the block listener tracks the head block number of the blockchain only without fetching any block details
-	BlockListenerTrackingModeHeadBlockNumber BlockListenerTrackingMode = "headBlockNumber"
-	// BlockListenerTrackingModeInMemoryPartialChain in this mode, the block listener tracks the in-memory partial chain of blocks, fetching block details as needed
-	BlockListenerTrackingModeInMemoryPartialChain BlockListenerTrackingMode = "inMemoryPartialChain"
+	// ChainTrackingModeLight - in this mode, the connector fetches the head block number only, no block details are fetched. Therefore, block listener is not supported, confirmation result contains only the number of the confirmation.
+	ChainTrackingModeLight ChainTrackingMode = "light"
+	// ChainTrackingModeFull - (default) in this mode, the connector fetches the head block number and downloads block details and maintain a consistent in-memory partial chain. Block listener is supported, and confirmation result contains extra block details as well as the number of the confirmation.
+	ChainTrackingModeFull ChainTrackingMode = "full"
 )
 
 type ConfirmationUpdateResult struct {
@@ -116,8 +116,9 @@ type ConfirmationUpdateResult struct {
 	// in the in-memory partial chain
 	// WARNING: mutation to this list is not expected, invalid modifications will cause inefficiencies in the reconciliation process
 	//          `rebuilt` will be true if an invalid confirmation list is detected by the reconciliation process
-	Confirmations            []*MinimalBlockInfo `json:"confirmations,omitempty"`  // the current list of confirmations for this reconcile request, only returned when confirmation mode is set to validatedBlocks
-	CurrentConfirmationCount uint64              `json:"currentConfirmationCount"` // the current number of confirmations for this reconcile request
+	Confirmations []*MinimalBlockInfo `json:"confirmations,omitempty"` // the current list of confirmations for this reconcile request, only returned when chainTrackingMode is set to full
+
+	CurrentConfirmationCount uint64 `json:"currentConfirmationCount"` // the current number of confirmations for this reconcile request
 
 	Receipt                 *TransactionReceiptResponse `json:"receipt,omitempty"`       // receipt for the transaction
 	Rebuilt                 bool                        `json:"rebuilt,omitempty"`       // when true, it means the existing confirmations contained invalid blocks, the new confirmations are rebuilt from scratch

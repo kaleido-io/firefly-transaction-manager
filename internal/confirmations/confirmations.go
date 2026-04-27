@@ -87,27 +87,27 @@ type RemovedListenerInfo struct {
 }
 
 type blockConfirmationManager struct {
-	baseContext               context.Context
-	ctx                       context.Context
-	cancelFunc                func()
-	newBlockHashEvents        chan *ffcapi.BlockHashEvent
-	connector                 ffcapi.API
-	blockListenerStale        bool
-	metricsEmitter            metrics.ConfirmationMetricsEmitter
-	requiredConfirmations     uint64
-	blockListenerTrackingMode ffcapi.BlockListenerTrackingMode
-	staleReceiptTimeout       time.Duration
-	bcmNotifications          chan *Notification
-	highestBlockSeen          uint64
-	headBlockNumber           uint64 // used for confirmation when block listener is in headBlockNumber mode
-	pending                   map[string]*pendingItem
-	pendingMux                sync.Mutex
-	receiptChecker            *receiptChecker
-	retry                     *retry.Retry
-	cblLock                   sync.Mutex
-	cbls                      map[fftypes.UUID]*confirmedBlockListener
-	fetchReceiptUponEntry     bool
-	done                      chan struct{}
+	baseContext           context.Context
+	ctx                   context.Context
+	cancelFunc            func()
+	newBlockHashEvents    chan *ffcapi.BlockHashEvent
+	connector             ffcapi.API
+	blockListenerStale    bool
+	metricsEmitter        metrics.ConfirmationMetricsEmitter
+	requiredConfirmations uint64
+	chainTrackingMode     ffcapi.ChainTrackingMode
+	staleReceiptTimeout   time.Duration
+	bcmNotifications      chan *Notification
+	highestBlockSeen      uint64
+	headBlockNumber       uint64 // used for confirmation when block listener is in headBlockNumber mode
+	pending               map[string]*pendingItem
+	pendingMux            sync.Mutex
+	receiptChecker        *receiptChecker
+	retry                 *retry.Retry
+	cblLock               sync.Mutex
+	cbls                  map[fftypes.UUID]*confirmedBlockListener
+	fetchReceiptUponEntry bool
+	done                  chan struct{}
 }
 
 func NewBlockConfirmationManager(baseContext context.Context, connector ffcapi.API, desc string,
@@ -118,15 +118,12 @@ func NewBlockConfirmationManager(baseContext context.Context, connector ffcapi.A
 		cbls:                  make(map[fftypes.UUID]*confirmedBlockListener),
 		blockListenerStale:    true,
 		requiredConfirmations: config.GetUint64(tmconfig.ConfirmationsRequired),
-		// currently the confirmation result is driven by the block listener mode,
-		// because when the block listener is in the headBlockNumber mode, the block information is not fetched and cached by the connector
-		// Therefore, it will be super inefficient to build the in memory partial chain in confirmations manager
-		blockListenerTrackingMode: connector.GetBlockListenerTrackingMode(baseContext),
-		staleReceiptTimeout:       config.GetDuration(tmconfig.ConfirmationsStaleReceiptTimeout),
-		bcmNotifications:          make(chan *Notification, config.GetInt(tmconfig.ConfirmationsNotificationQueueLength)),
-		pending:                   make(map[string]*pendingItem),
-		newBlockHashEvents:        make(chan *ffcapi.BlockHashEvent, config.GetInt(tmconfig.ConfirmationsBlockQueueLength)),
-		metricsEmitter:            cme,
+		chainTrackingMode:     connector.GetChainTrackingMode(baseContext),
+		staleReceiptTimeout:   config.GetDuration(tmconfig.ConfirmationsStaleReceiptTimeout),
+		bcmNotifications:      make(chan *Notification, config.GetInt(tmconfig.ConfirmationsNotificationQueueLength)),
+		pending:               make(map[string]*pendingItem),
+		newBlockHashEvents:    make(chan *ffcapi.BlockHashEvent, config.GetInt(tmconfig.ConfirmationsBlockQueueLength)),
+		metricsEmitter:        cme,
 		retry: &retry.Retry{
 			InitialDelay: config.GetDuration(tmconfig.ConfirmationsRetryInitDelay),
 			MaximumDelay: config.GetDuration(tmconfig.ConfirmationsRetryMaxDelay),
@@ -414,7 +411,7 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 		blocks := bcm.newBlockState()
 
 		if bcm.blockListenerStale {
-			if bcm.blockListenerTrackingMode == ffcapi.BlockListenerTrackingModeInMemoryPartialChain {
+			if bcm.chainTrackingMode == ffcapi.ChainTrackingModeFull {
 				// only need to build the in memory partial chain when the block listener supports it
 				if err := bcm.walkChain(blocks); err != nil {
 					log.L(bcm.ctx).Errorf("Failed to walk chain after restoring blockListener: %s", err)
@@ -559,7 +556,7 @@ func (bcm *blockConfirmationManager) removeItem(pending *pendingItem, stale bool
 }
 
 func (bcm *blockConfirmationManager) processBlockHashes(blockHashes []string) {
-	if bcm.blockListenerTrackingMode == ffcapi.BlockListenerTrackingModeHeadBlockNumber {
+	if bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight {
 		// for headBlockNumber mode, we don't need to fetch blocks to form a local in memory partial chain
 		// we just need to do confirmation check and dispatch confirmations for any applicable pending items
 		bcm.checkAndDispatchConfirmationsUsingBlockHeight()
@@ -791,7 +788,7 @@ func (bcm *blockConfirmationManager) walkChainForItem(pending *pendingItem, bloc
 		return nil
 	}
 
-	if bcm.blockListenerTrackingMode == ffcapi.BlockListenerTrackingModeHeadBlockNumber {
+	if bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight {
 		return bcm.confirmationCheckUsingHighestBlock(pending)
 	}
 

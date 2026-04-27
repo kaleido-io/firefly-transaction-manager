@@ -44,7 +44,7 @@ func newTestBlockConfirmationManager() (*blockConfirmationManager, *ffcapimocks.
 func newTestBlockConfirmationManagerCustomConfig() (*blockConfirmationManager, *ffcapimocks.API) {
 	logrus.SetLevel(logrus.DebugLevel)
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	emm := &metricsmocks.EventMetricsEmitter{}
 	emm.On("RecordNotificationQueueingMetrics", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	emm.On("RecordBlockHashProcessMetrics", mock.Anything, mock.Anything).Maybe()
@@ -68,7 +68,7 @@ func newTestBlockConfirmationManagerHeadBlockNumber() (*blockConfirmationManager
 	config.Set(tmconfig.ConfirmationsFetchReceiptUponEntry, false)
 	logrus.SetLevel(logrus.DebugLevel)
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeHeadBlockNumber).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeLight).Maybe()
 	emm := &metricsmocks.EventMetricsEmitter{}
 	emm.On("RecordNotificationQueueingMetrics", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	emm.On("RecordBlockHashProcessMetrics", mock.Anything, mock.Anything).Maybe()
@@ -1490,12 +1490,9 @@ func TestBlockConfirmationManagerHeadBlockNumberReceiptNotFoundReschedules(t *te
 		},
 	}
 
-	receiptChecked := make(chan struct{}, 1)
 	mca.On("TransactionReceipt", mock.Anything, mock.MatchedBy(func(r *ffcapi.TransactionReceiptRequest) bool {
 		return r.TransactionHash == txHash
-	})).Run(func(mock.Arguments) {
-		receiptChecked <- struct{}{}
-	}).Return(nil, ffcapi.ErrorReasonNotFound, errors.New("not found")).Once()
+	})).Return(nil, ffcapi.ErrorReasonNotFound, errors.New("not found")).Once()
 
 	bcm.Start()
 	ch := bcm.GetReceiveChannel()
@@ -1507,11 +1504,23 @@ func TestBlockConfirmationManagerHeadBlockNumberReceiptNotFoundReschedules(t *te
 	<-confirmed
 
 	ch <- &ffcapi.BlockHashEvent{HeadBlockNumber: 1004}
+	// Wait until the not-found receipt path has re-queued a check (safe to read under
+	// receiptChecker.cond). pendingItem fields are updated by the listener without
+	// pendingMux, so assert those only after Stop freezes the listener.
+	assert.Eventually(t, func() bool {
+		bcm.receiptChecker.cond.L.Lock()
+		l := bcm.receiptChecker.entries.Len()
+		bcm.receiptChecker.cond.L.Unlock()
+		return l == 1
+	}, time.Second, 5*time.Millisecond)
+
 	select {
-	case <-receiptChecked:
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for TransactionReceipt")
+	case n := <-confirmed:
+		t.Fatalf("unexpected confirmation notification: %+v", n)
+	case <-time.After(50 * time.Millisecond):
 	}
+
+	bcm.Stop()
 
 	bcm.pendingMux.Lock()
 	var cleared *pendingItem
@@ -1524,15 +1533,6 @@ func TestBlockConfirmationManagerHeadBlockNumberReceiptNotFoundReschedules(t *te
 	assert.Equal(t, "", cleared.blockHash)
 	assert.Equal(t, uint64(0), cleared.blockNumber)
 	assert.Nil(t, cleared.previousConfirmationCount)
-	assert.Equal(t, 1, bcm.receiptChecker.entries.Len())
-
-	select {
-	case n := <-confirmed:
-		t.Fatalf("unexpected confirmation notification: %+v", n)
-	case <-time.After(50 * time.Millisecond):
-	}
-
-	bcm.Stop()
 	mca.AssertExpectations(t)
 }
 

@@ -478,19 +478,19 @@ func (_m *API) GasPriceEstimate(ctx context.Context, req *ffcapi.GasPriceEstimat
 	return r0, r1, r2
 }
 
-// GetBlockListenerTrackingMode provides a mock function with given fields: ctx
-func (_m *API) GetBlockListenerTrackingMode(ctx context.Context) ffcapi.BlockListenerTrackingMode {
+// GetChainTrackingMode provides a mock function with given fields: ctx
+func (_m *API) GetChainTrackingMode(ctx context.Context) ffcapi.ChainTrackingMode {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetBlockListenerTrackingMode")
+		panic("no return value specified for GetChainTrackingMode")
 	}
 
-	var r0 ffcapi.BlockListenerTrackingMode
-	if rf, ok := ret.Get(0).(func(context.Context) ffcapi.BlockListenerTrackingMode); ok {
+	var r0 ffcapi.ChainTrackingMode
+	if rf, ok := ret.Get(0).(func(context.Context) ffcapi.ChainTrackingMode); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(ffcapi.BlockListenerTrackingMode)
+		r0 = ret.Get(0).(ffcapi.ChainTrackingMode)
 	}
 
 	return r0

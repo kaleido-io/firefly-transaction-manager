@@ -82,7 +82,7 @@ func newTestManager(t *testing.T) (string, *manager, func()) {
 
 	mca := &ffcapimocks.API{}
 	mca.On("NewBlockListener", mock.Anything, mock.Anything).Return(nil, ffcapi.ErrorReason(""), nil).Maybe()
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	mm, err := NewManager(context.Background(), mca)
 	assert.NoError(t, err)
 
@@ -106,7 +106,7 @@ func newTestManagerMockNoRichDB(t *testing.T) (string, *manager, func()) {
 	url := testManagerCommonInit(t)
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	m := newManager(context.Background(), mca)
 
 	mpm := &persistencemocks.Persistence{}
@@ -134,7 +134,7 @@ func newTestManagerMockRichDB(t *testing.T) (string, *manager, *persistencemocks
 	url := testManagerCommonInit(t)
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	m := newManager(context.Background(), mca)
 
 	mpm := &persistencemocks.Persistence{}
@@ -180,7 +180,7 @@ func newTestManagerWithMetrics(t *testing.T, deprecated bool) (string, *manager,
 
 	mca := &ffcapimocks.API{}
 	mca.On("NewBlockListener", mock.Anything, mock.Anything).Return(nil, ffcapi.ErrorReason(""), nil).Maybe()
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	mm, err := NewManager(context.Background(), mca)
 	assert.NoError(t, err)
 
@@ -201,7 +201,7 @@ func newTestManagerMockPersistence(t *testing.T) (string, *manager, func()) {
 	url := testManagerCommonInit(t)
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	m := newManager(context.Background(), mca)
 	mp := &persistencemocks.Persistence{}
 	mp.On("Close", mock.Anything).Return(nil).Maybe()
@@ -246,7 +246,7 @@ func TestNewManagerWithLegacyConfiguration(t *testing.T) {
 
 	tmconfig.DeprecatedPolicyEngineBaseConfig.SubSection("simple").Set(simple.FixedGasPrice, "223344556677")
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	m := newManager(context.Background(), mca)
 	mp := &persistencemocks.Persistence{}
 	mp.On("Close", mock.Anything).Return(nil).Maybe()
@@ -268,7 +268,7 @@ func TestNewManagerBadHttpConfig(t *testing.T) {
 	tmconfig.TransactionHandlerBaseConfig.SubSection("simple").Set(simple.FixedGasPrice, "223344556677")
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	_, err := NewManager(context.Background(), mca)
 	assert.Error(t, err)
 	assert.Regexp(t, "FF00151", err)
@@ -289,7 +289,7 @@ func TestNewManagerBadLevelDBConfig(t *testing.T) {
 	tmconfig.TransactionHandlerBaseConfig.SubSection("simple").Set(simple.FixedGasPrice, "223344556677")
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	_, err = NewManager(context.Background(), mca)
 	assert.Regexp(t, "FF21049", err)
 
@@ -305,7 +305,7 @@ func TestNewManagerBadPersistenceConfig(t *testing.T) {
 	tmconfig.TransactionHandlerBaseConfig.SubSection("simple").Set(simple.FixedGasPrice, "223344556677")
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	_, err := NewManager(context.Background(), mca)
 	assert.Regexp(t, "FF21043", err)
 
@@ -319,7 +319,7 @@ func TestNewManagerInvalidTransactionHandlerName(t *testing.T) {
 	config.Set(tmconfig.TransactionsHandlerName, "wrong")
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	_, err := NewManager(context.Background(), mca)
 	assert.Regexp(t, "FF21070", err)
 
@@ -365,7 +365,7 @@ func TestNewManagerWithMetricsBadConfig(t *testing.T) {
 	tmconfig.TransactionHandlerBaseConfig.SubSection("simple").Set(simple.FixedGasPrice, "223344556677")
 
 	mca := &ffcapimocks.API{}
-	mca.On("GetBlockListenerTrackingMode", mock.Anything).Return(ffcapi.BlockListenerTrackingModeInMemoryPartialChain, nil).Maybe()
+	mca.On("GetChainTrackingMode", mock.Anything).Return(ffcapi.ChainTrackingModeFull, nil).Maybe()
 	_, err := NewManager(context.Background(), mca)
 	assert.Error(t, err)
 	assert.Regexp(t, "FF00151", err)
