@@ -412,7 +412,7 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 
 		if bcm.blockListenerStale {
 			if bcm.chainTrackingMode == ffcapi.ChainTrackingModeFull {
-				// only need to build the in memory partial chain when the block listener supports it
+				// only need to build the in memory partial chain when the block details are available
 				if err := bcm.walkChain(blocks); err != nil {
 					log.L(bcm.ctx).Errorf("Failed to walk chain after restoring blockListener: %s", err)
 					continue
@@ -557,8 +557,7 @@ func (bcm *blockConfirmationManager) removeItem(pending *pendingItem, stale bool
 
 func (bcm *blockConfirmationManager) processBlockHashes(blockHashes []string) {
 	if bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight {
-		// for headBlockNumber mode, we don't need to fetch blocks to form a local in memory partial chain
-		// we just need to do confirmation check and dispatch confirmations for any applicable pending items
+		// for light chain tracking mode, no block details are available, only need to calculate the number of confirmations using head block number
 		bcm.checkAndDispatchConfirmationsUsingBlockHeight()
 		return
 	}
