@@ -99,7 +99,7 @@ type blockConfirmationManager struct {
 	staleReceiptTimeout   time.Duration
 	bcmNotifications      chan *Notification
 	highestBlockSeen      uint64
-	headBlockNumber       uint64 // used for confirmation when block listener is in headBlockNumber mode
+	headBlockNumber       uint64 // used for confirmation when the connector is running in light mode
 	pending               map[string]*pendingItem
 	pendingMux            sync.Mutex
 	receiptChecker        *receiptChecker
