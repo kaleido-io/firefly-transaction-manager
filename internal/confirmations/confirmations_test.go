@@ -1795,7 +1795,7 @@ func TestBlockConfirmationManagerHeadBlockNumberReceiptOtherErrorNoReschedule(t 
 	mca.AssertExpectations(t)
 }
 
-// TestBlockConfirmationManagerHeadBlockNumberNoOpWithoutReceipt covers confirmationCheckUsingHighestBlock
+// TestBlockConfirmationManagerHeadBlockNumberNoOpWithoutReceipt tests confirmationCheckUsingHeadBlockNumber
 // when a pending transaction has no block hash yet (no receipt): head updates must not call dispatch or TransactionReceipt.
 func TestBlockConfirmationManagerHeadBlockNumberNoOpWithoutReceipt(t *testing.T) {
 	bcm, mca := newTestBlockConfirmationManagerHeadBlockNumber()

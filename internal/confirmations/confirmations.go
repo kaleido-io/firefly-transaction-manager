@@ -788,7 +788,7 @@ func (bcm *blockConfirmationManager) walkChainForItem(pending *pendingItem, bloc
 	}
 
 	if bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight {
-		return bcm.confirmationCheckUsingHighestBlock(pending)
+		return bcm.confirmationCheckUsingHeadBlockNumber(pending)
 	}
 
 	pendingKey := pending.getKey()
@@ -843,13 +843,13 @@ func (bcm *blockConfirmationManager) checkAndDispatchConfirmationsUsingBlockHeig
 	}
 	bcm.pendingMux.Unlock()
 	for _, p := range items {
-		if err := bcm.confirmationCheckUsingHighestBlock(p); err != nil {
+		if err := bcm.confirmationCheckUsingHeadBlockNumber(p); err != nil {
 			log.L(bcm.ctx).Errorf("Block height confirmation refresh failed for %s: %s", p.getKey(), err)
 		}
 	}
 }
 
-func (bcm *blockConfirmationManager) confirmationCheckUsingHighestBlock(pending *pendingItem) error {
+func (bcm *blockConfirmationManager) confirmationCheckUsingHeadBlockNumber(pending *pendingItem) error {
 	if pending.blockHash == "" {
 		// no receipt yet, so no confirmation check
 		return nil
