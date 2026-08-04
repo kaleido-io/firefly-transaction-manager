@@ -237,8 +237,12 @@ func (bcm *blockConfirmationManager) Stop() {
 	if bcm.done != nil {
 		bcm.cancelFunc()
 		bcm.receiptChecker.close()
-		bcm.receiptChecker = nil
+		// Wait for confirmationsListener to actually observe ctx.Done() and return before
+		// nil-ing out receiptChecker - its select also has newBlockHashEvents/bcmNotifications
+		// cases, so a buffered event can still win a race against ctx.Done() and drive one more
+		// loop iteration that calls into receiptChecker (e.g. via scheduleReceiptChecks).
 		<-bcm.done
+		bcm.receiptChecker = nil
 		bcm.done = nil
 		// Reset context ready for restart
 		bcm.ctx, bcm.cancelFunc = context.WithCancel(bcm.baseContext)
@@ -422,8 +426,9 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 		}
 
 		blockHashCount := len(blockHashes)
+		newBlockEvent := triggerType == "newBlockHashes"
 		// Process each new block
-		bcm.processBlockHashes(blockHashes)
+		bcm.processBlockHashes(blockHashes, newBlockEvent)
 		// Truncate the block hashes now we've processed them
 		blockHashes = blockHashes[:0]
 
@@ -439,6 +444,11 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 			continue
 		}
 		scheduleAllTxReceipts := !receivedFirstBlock && blockHashCount > 0
+		if bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight {
+			// in light mode, we need to schedule all transactions if we have received any blocks
+			// this is because in light mode, we do not have block details available to check transaction hashes against
+			scheduleAllTxReceipts = scheduleAllTxReceipts || newBlockEvent
+		}
 		// Mark receipts stale after duration
 		bcm.scheduleReceiptChecks(scheduleAllTxReceipts)
 		receivedFirstBlock = receivedFirstBlock || blockHashCount > 0
@@ -555,9 +565,13 @@ func (bcm *blockConfirmationManager) removeItem(pending *pendingItem, stale bool
 	bcm.pendingMux.Unlock()
 }
 
-func (bcm *blockConfirmationManager) processBlockHashes(blockHashes []string) {
+func (bcm *blockConfirmationManager) processBlockHashes(blockHashes []string, newBlockEvent bool) {
 	if bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight {
 		// for light chain tracking mode, no block details are available, only need to calculate the number of confirmations using head block number
+		if !newBlockEvent {
+			// if this function was not triggered by a new block event, we do not need to process any pending transactions
+			return
+		}
 		bcm.checkAndDispatchConfirmationsUsingBlockHeight()
 		return
 	}
