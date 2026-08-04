@@ -1342,6 +1342,67 @@ func TestScheduleReceiptCheck(t *testing.T) {
 
 }
 
+// TestScheduleReceiptChecksLightModeRetriesUnreceiptedItemsEveryBlock is the regression test for
+// why light mode must retry an outstanding receipt check on every new block: unlike full mode
+// (which actively detects a mined transaction by scanning each new block's transaction list, see
+// processBlock), light mode has no way to know which block will contain a given pending
+// transaction. So an item that already had its first check (scheduledAtLeastOnce=true) but got
+// "not found" - still no blockHash - must be retried on the very next block, not left to wait for
+// the 60s stale-receipt-timeout.
+func TestScheduleReceiptChecksLightModeRetriesUnreceiptedItemsEveryBlock(t *testing.T) {
+
+	bcm, _ := newTestBlockConfirmationManagerHeadBlockNumber() // light mode
+	emm := &metricsmocks.EventMetricsEmitter{}
+	bcm.receiptChecker = newReceiptChecker(bcm, 0, emm)
+
+	pendingNoReceiptYet := &pendingItem{ // already checked once, "not found" - must be retried
+		pType:                pendingTypeTransaction,
+		lastReceiptCheck:     time.Now(), // just checked - nowhere near the stale-timeout
+		transactionHash:      "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+		scheduledAtLeastOnce: true,
+		blockHash:            "",
+	}
+	pendingAlreadyHasReceipt := &pendingItem{ // already has a receipt - not this path's concern
+		pType:                pendingTypeTransaction,
+		lastReceiptCheck:     time.Now(),
+		transactionHash:      "0x531e219d98d81dc9f9a14811ac537479f5d77a74bdba47629bfbebe2d7663ce7",
+		scheduledAtLeastOnce: true,
+		blockHash:            "0x0e32d749a86cfaf551d528b5b121cea456f980a39e5b8136eb8e85dbc744a542",
+	}
+	bcm.pending[pendingNoReceiptYet.getKey()] = pendingNoReceiptYet
+	bcm.pending[pendingAlreadyHasReceipt.getKey()] = pendingAlreadyHasReceipt
+
+	bcm.scheduleReceiptChecks(true) // simulates a new light-mode block event
+
+	assert.Equal(t, 1, bcm.receiptChecker.entries.Len())
+	assert.Equal(t, pendingNoReceiptYet, bcm.receiptChecker.entries.Front().Value.(*pendingItem))
+}
+
+// TestScheduleReceiptChecksFullModeDoesNotRetryUnreceiptedItems is the guard test for the race we
+// found and reverted: applying the light-mode retry-every-block behavior in full mode too would
+// race against processBlock's own active scheduling of the same item (it caused a duplicate
+// in-flight receipt check against TestBlockConfirmationManagerE2ETransactionMovedFork). Full mode
+// must only ever schedule a not-yet-scheduled item, never re-trigger on blockHash=="" alone.
+func TestScheduleReceiptChecksFullModeDoesNotRetryUnreceiptedItems(t *testing.T) {
+
+	bcm, _ := newTestBlockConfirmationManager() // full mode
+	emm := &metricsmocks.EventMetricsEmitter{}
+	bcm.receiptChecker = newReceiptChecker(bcm, 0, emm)
+
+	pendingAlreadyScheduledNoReceiptYet := &pendingItem{
+		pType:                pendingTypeTransaction,
+		lastReceiptCheck:     time.Now(), // just checked - nowhere near the stale-timeout
+		transactionHash:      "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+		scheduledAtLeastOnce: true,
+		blockHash:            "",
+	}
+	bcm.pending[pendingAlreadyScheduledNoReceiptYet.getKey()] = pendingAlreadyScheduledNoReceiptYet
+
+	bcm.scheduleReceiptChecks(true)
+
+	assert.Equal(t, 0, bcm.receiptChecker.entries.Len())
+}
+
 func TestBlockState(t *testing.T) {
 
 	bcm, mca := newTestBlockConfirmationManager()

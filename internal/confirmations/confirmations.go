@@ -458,15 +458,27 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 
 }
 
-func (bcm *blockConfirmationManager) scheduleReceiptChecks(receivedBlocksFirstTime bool) {
+func (bcm *blockConfirmationManager) scheduleReceiptChecks(scheduleUnreceiptedItems bool) {
 	now := time.Now()
+	// In light mode there is no way to know which block (if any) will contain a given pending
+	// transaction - unlike full mode, which actively detects a mined transaction by scanning each
+	// new block's transaction list (processBlock). So in light mode, an item that still has no
+	// receipt must be retried on every new block, not just scheduled once - otherwise a "not found"
+	// result on the first check would fall all the way back to the (much slower) stale-timeout for
+	// every subsequent attempt. This is deliberately restricted to light mode: applying it in full
+	// mode as well would race against processBlock's own scheduling of the same item (verified by
+	// reproducing a duplicate in-flight receipt check against TestBlockConfirmationManagerE2ETransactionMovedFork).
+	retryUnreceiptedLightModeItems := scheduleUnreceiptedItems && bcm.chainTrackingMode == ffcapi.ChainTrackingModeLight
 	for _, pending := range bcm.pending {
 		// For efficiency we do a dirty read on the receipt check time before going into the locking
 		// check within the receipt checker
 		if pending.pType == pendingTypeTransaction {
-			if receivedBlocksFirstTime && !pending.scheduledAtLeastOnce {
+			switch {
+			case scheduleUnreceiptedItems && !pending.scheduledAtLeastOnce:
 				bcm.receiptChecker.schedule(pending, false)
-			} else if now.Sub(pending.lastReceiptCheck) > bcm.staleReceiptTimeout {
+			case retryUnreceiptedLightModeItems && pending.blockHash == "":
+				bcm.receiptChecker.schedule(pending, false)
+			case now.Sub(pending.lastReceiptCheck) > bcm.staleReceiptTimeout:
 				// schedule stale receipt checks
 				bcm.receiptChecker.schedule(pending, true /* suspected timeout - prompts re-check in the lock */)
 			}
