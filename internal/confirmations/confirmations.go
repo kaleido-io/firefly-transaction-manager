@@ -284,6 +284,13 @@ func (bcm *blockConfirmationManager) Notify(n *Notification) error {
 			return i18n.NewError(bcm.ctx, tmmsgs.MsgInvalidConfirmationRequest, n)
 		}
 	}
+	queueCap := cap(bcm.bcmNotifications)
+	queueLen := len(bcm.bcmNotifications)
+	if queueLen >= queueCap {
+		log.L(bcm.ctx).Warnf("Confirmation notification queue full (%d/%d), blocking on type=%s", queueLen, queueCap, n.NotificationType)
+	} else if queueLen >= queueCap-1 {
+		log.L(bcm.ctx).Warnf("Confirmation notification queue nearly full (%d/%d) type=%s", queueLen, queueCap, n.NotificationType)
+	}
 	select {
 	case bcm.bcmNotifications <- n:
 		bcm.metricsEmitter.RecordNotificationQueueingMetrics(bcm.ctx, string(n.NotificationType), time.Since(startTime).Seconds())
@@ -381,6 +388,12 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 			if bhe.GapPotential {
 				bcm.blockListenerStale = true
 			}
+			blockQueueDepth := len(bcm.newBlockHashEvents)
+			blockQueueCap := cap(bcm.newBlockHashEvents)
+			if blockQueueDepth >= blockQueueCap-1 {
+				log.L(bcm.ctx).Warnf("Confirmation block event queue nearly full (%d/%d) headBlock=%d gapPotential=%t",
+					blockQueueDepth, blockQueueCap, bhe.HeadBlockNumber, bhe.GapPotential)
+			}
 			blockHashes = append(blockHashes, bhe.BlockHashes...)
 			bcm.headBlockNumber = bhe.HeadBlockNumber // always update the head block number, NOTE: the number can decrease during a re-org
 			// Need to also pass this event to any confirmed block listeners
@@ -410,6 +423,13 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 			}
 		}
 		startTime := time.Now()
+		bcm.pendingMux.Lock()
+		pendingItemCount := len(bcm.pending)
+		bcm.pendingMux.Unlock()
+		blockHashCount := len(blockHashes)
+		notificationCount := len(notifications)
+		log.L(bcm.ctx).Debugf("Confirmation listener iteration starting trigger=%s blockHashes=%d notifications=%d pendingItems=%d headBlock=%d blockQueueDepth=%d notificationQueueDepth=%d",
+			triggerType, blockHashCount, notificationCount, pendingItemCount, bcm.headBlockNumber, len(bcm.newBlockHashEvents), len(bcm.bcmNotifications))
 
 		// Each time round the loop we need to have a consistent view of the chain.
 		// This view must not add later blocks (by number) in, or change the hash of blocks,
@@ -428,14 +448,11 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 			bcm.blockListenerStale = false
 		}
 
-		blockHashCount := len(blockHashes)
 		newBlockEvent := triggerType == "newBlockHashes"
 		// Process each new block
 		bcm.processBlockHashes(blockHashes, newBlockEvent)
 		// Truncate the block hashes now we've processed them
 		blockHashes = blockHashes[:0]
-
-		notificationCount := len(notifications)
 
 		// Process any new notifications - we do this at the end, so it can benefit
 		// from knowing the latest highestBlockSeen
@@ -455,8 +472,10 @@ func (bcm *blockConfirmationManager) confirmationsListener() {
 		// Mark receipts stale after duration
 		bcm.scheduleReceiptChecks(scheduleAllTxReceipts)
 		receivedFirstBlock = receivedFirstBlock || blockHashCount > 0
-		log.L(bcm.ctx).Tracef("[TimeTrace] Confirmation listener processed %d block hashes and %d notifications in %s, trigger type: %s", blockHashCount, notificationCount, time.Since(startTime), triggerType)
-
+		iterationDuration := time.Since(startTime)
+		log.L(bcm.ctx).Debugf("Confirmation listener iteration complete trigger=%s duration=%s blockHashes=%d notifications=%d pendingItems=%d headBlock=%d blockQueueDepth=%d notificationQueueDepth=%d",
+			triggerType, iterationDuration, blockHashCount, notificationCount, pendingItemCount, bcm.headBlockNumber, len(bcm.newBlockHashEvents), len(bcm.bcmNotifications))
+		log.L(bcm.ctx).Tracef("[TimeTrace] Confirmation listener processed %d block hashes and %d notifications in %s, trigger type: %s", blockHashCount, notificationCount, iterationDuration, triggerType)
 	}
 
 }
@@ -880,7 +899,9 @@ func (bcm *blockConfirmationManager) checkAndDispatchConfirmationsUsingBlockHeig
 	for _, p := range bcm.pending {
 		items = append(items, p)
 	}
+	headBlock := bcm.headBlockNumber
 	bcm.pendingMux.Unlock()
+	log.L(bcm.ctx).Debugf("Checking block height confirmations for %d pending items headBlock=%d", len(items), headBlock)
 	for _, p := range items {
 		if err := bcm.confirmationCheckUsingHeadBlockNumber(p); err != nil {
 			log.L(bcm.ctx).Errorf("Block height confirmation refresh failed for %s: %s", p.getKey(), err)
@@ -916,7 +937,9 @@ func (bcm *blockConfirmationManager) dispatchBlockHeightConfirmations(pending *p
 
 	confirmed := confirmationCount == bcm.requiredConfirmations
 	if confirmed {
+		receiptValidationStartTime := time.Now()
 		// do confirmation check here to ensure the transaction receipt is still valid
+		log.L(bcm.ctx).Debugf("Validating transaction receipt on confirmation listener item=%s", pending.getKey())
 		res, reason, err := bcm.connector.TransactionReceipt(bcm.ctx, &ffcapi.TransactionReceiptRequest{
 			TransactionHash: pending.transactionHash,
 		})
@@ -927,6 +950,8 @@ func (bcm *blockConfirmationManager) dispatchBlockHeightConfirmations(pending *p
 				pending.blockNumber = 0
 				pending.previousConfirmationCount = nil
 				bcm.receiptChecker.schedule(pending, true)
+			} else {
+				log.L(bcm.ctx).Errorf("Confirmation listener receipt validation failed item=%s duration=%s: %s", pending.getKey(), time.Since(receiptValidationStartTime), err)
 			}
 			return err
 		}
